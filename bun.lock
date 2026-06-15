@@ -4,6 +4,12 @@
   "workspaces": {
     "": {
       "name": "bubble-blog",
+      "dependencies": {
+        "markdown-it": "^14.2.0",
+      },
+      "devDependencies": {
+        "@types/markdown-it": "^14.1.2",
+      },
     },
     "packages/server": {
       "name": "@bubbleblog/server",

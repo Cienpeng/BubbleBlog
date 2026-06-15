@@ -1,5 +1,11 @@
 {
   "name": "bubble-blog",
   "private": true,
-  "workspaces": ["packages/*"]
+  "workspaces": ["packages/*"],
+  "dependencies": {
+    "markdown-it": "^14.2.0"
+  },
+  "devDependencies": {
+    "@types/markdown-it": "^14.1.2"
+  }
 }
