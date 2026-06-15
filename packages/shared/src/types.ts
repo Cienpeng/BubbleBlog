@@ -74,6 +74,7 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
+/** Single-user blog: only password needed (username is always 'admin') */
 export interface LoginRequest {
   password: string;
 }
