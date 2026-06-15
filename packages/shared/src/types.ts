@@ -1,4 +1,5 @@
-export interface User {
+/** Database row type — NEVER expose in API responses (contains password_hash) */
+export interface UserRow {
   id: number;
   username: string;
   password_hash: string;
