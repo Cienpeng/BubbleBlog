@@ -1,0 +1,101 @@
+import sql from './connection';
+
+const migration = `
+-- Users table
+CREATE TABLE IF NOT EXISTS users (
+  id SERIAL PRIMARY KEY,
+  username VARCHAR(50) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  last_active_at TIMESTAMP DEFAULT NOW(),
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Articles table
+CREATE TABLE IF NOT EXISTS articles (
+  id SERIAL PRIMARY KEY,
+  title VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) UNIQUE NOT NULL,
+  content_md TEXT NOT NULL,
+  content_html TEXT NOT NULL DEFAULT '',
+  excerpt VARCHAR(500),
+  cover_image VARCHAR(255),
+  status VARCHAR(20) NOT NULL DEFAULT 'draft'
+    CHECK (status IN ('draft', 'published')),
+  reading_time INTEGER DEFAULT 1,
+  search_vector TSVECTOR,
+  published_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Tags table
+CREATE TABLE IF NOT EXISTS tags (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(50) UNIQUE NOT NULL,
+  slug VARCHAR(50) UNIQUE NOT NULL
+);
+
+-- Article-Tags junction
+CREATE TABLE IF NOT EXISTS article_tags (
+  article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
+  tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (article_id, tag_id)
+);
+
+-- Likes table
+CREATE TABLE IF NOT EXISTS likes (
+  id SERIAL PRIMARY KEY,
+  article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
+  fingerprint VARCHAR(64) NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE (article_id, fingerprint)
+);
+
+-- Media table
+CREATE TABLE IF NOT EXISTS media (
+  id SERIAL PRIMARY KEY,
+  filename VARCHAR(255) NOT NULL,
+  original_name VARCHAR(255) NOT NULL,
+  mime_type VARCHAR(50) NOT NULL,
+  size INTEGER NOT NULL,
+  article_id INTEGER REFERENCES articles(id) ON DELETE SET NULL,
+  uploaded_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_articles_status ON articles(status);
+CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles(published_at DESC);
+CREATE INDEX IF NOT EXISTS idx_articles_slug ON articles(slug);
+CREATE INDEX IF NOT EXISTS idx_likes_article ON likes(article_id);
+CREATE INDEX IF NOT EXISTS idx_tags_slug ON tags(slug);
+
+-- Full-text search: trigger for auto-updating search_vector
+CREATE OR REPLACE FUNCTION update_search_vector() RETURNS TRIGGER AS $$
+BEGIN
+  NEW.search_vector :=
+    setweight(to_tsvector('english', COALESCE(NEW.title, '')), 'A') ||
+    setweight(to_tsvector('english', COALESCE(NEW.content_md, '')), 'B');
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_search_vector ON articles;
+CREATE TRIGGER trg_search_vector
+  BEFORE INSERT OR UPDATE ON articles
+  FOR EACH ROW EXECUTE FUNCTION update_search_vector();
+
+-- Create GIN index for full text search
+CREATE INDEX IF NOT EXISTS idx_articles_search ON articles USING GIN(search_vector);
+`;
+
+async function migrate() {
+  console.log('Running migrations...');
+  await sql.unsafe(migration);
+  console.log('Migrations complete.');
+  await sql.end();
+}
+
+migrate().catch((err) => {
+  console.error('Migration failed:', err);
+  process.exit(1);
+});
