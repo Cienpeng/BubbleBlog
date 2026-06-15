@@ -10,6 +10,27 @@ import { handleSEO } from './routes/seo';
 
 const PORT = parseInt(process.env.PORT || '3000');
 
+const SECURITY_HEADERS: Record<string, string> = {
+  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:",
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY',
+  'Referrer-Policy': 'strict-origin-when-cross-origin',
+};
+
+function addSecurityHeaders(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    if (!headers.has(key)) {
+      headers.set(key, value);
+    }
+  }
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
 Bun.serve({
   port: PORT,
   async fetch(req) {
@@ -17,45 +38,45 @@ Bun.serve({
 
     // Health check (no rate limit)
     if (url.pathname === '/api/health') {
-      return Response.json({ success: true, data: { status: 'ok' } });
+      return addSecurityHeaders(Response.json({ success: true, data: { status: 'ok' } }));
     }
 
     // Global rate limit
     const rateLimitResponse = globalRateLimit(req);
-    if (rateLimitResponse) return rateLimitResponse;
+    if (rateLimitResponse) return addSecurityHeaders(rateLimitResponse);
 
     // CORS preflight
     const corsResponse = handleCors(req);
-    if (corsResponse) return corsResponse;
+    if (corsResponse) return corsResponse; // Already has headers from handleCors
 
     // Route matching
     if (url.pathname.startsWith('/api/auth/')) {
-      return handleAuth(req);
+      return addSecurityHeaders(await handleAuth(req));
     }
     if (url.pathname.startsWith('/api/articles/') || url.pathname === '/api/articles') {
-      return handleArticles(req);
+      return addSecurityHeaders(await handleArticles(req));
     }
     if (url.pathname.startsWith('/api/tags')) {
-      return handleTags(req);
+      return addSecurityHeaders(await handleTags(req));
     }
     if (url.pathname.startsWith('/api/search')) {
-      return handleSearch(req);
+      return addSecurityHeaders(await handleSearch(req));
     }
     if (url.pathname.includes('/likes')) {
-      return handleLikes(req);
+      return addSecurityHeaders(await handleLikes(req));
     }
     if (url.pathname.startsWith('/api/media') || url.pathname.startsWith('/media/')) {
-      return handleMedia(req);
+      return addSecurityHeaders(await handleMedia(req));
     }
     if (url.pathname === '/sitemap.xml') {
-      return handleSEO(req);
+      return addSecurityHeaders(await handleSEO(req));
     }
 
     // 404
-    return Response.json(
+    return addSecurityHeaders(Response.json(
       { success: false, error: 'Not found' },
       { status: 404, headers: corsHeaders() }
-    );
+    ));
   },
 });
 
