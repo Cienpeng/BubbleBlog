@@ -7,7 +7,15 @@
       "Bash(bunx tsc *)",
       "Bash(bun x *)",
       "Bash(git add *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "Bash(curl -s http://localhost:3000/api/nonexistent)",
+      "Bash(curl -sI http://localhost:3000/api/nonexistent)",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/login -H 'Content-Type: application/json' -d '{\"password\":\"test123\"}')",
+      "Bash(curl -s http://localhost:3000/api/health)",
+      "Bash(curl -s -X POST http://localhost:3000/api/auth/setup -H 'Content-Type: application/json' -d '{\"password\":\"testpass123\"}')",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"bun run src/index.ts\")",
+      "Bash(taskkill //F //IM \"bun.exe\")"
     ]
   }
 }

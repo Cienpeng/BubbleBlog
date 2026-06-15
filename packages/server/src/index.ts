@@ -49,34 +49,42 @@ Bun.serve({
     const corsResponse = handleCors(req);
     if (corsResponse) return corsResponse; // Already has headers from handleCors
 
-    // Route matching
-    if (url.pathname.startsWith('/api/auth/')) {
-      return addSecurityHeaders(await handleAuth(req));
-    }
-    if (url.pathname.startsWith('/api/articles/') || url.pathname === '/api/articles') {
-      return addSecurityHeaders(await handleArticles(req));
-    }
-    if (url.pathname.startsWith('/api/tags')) {
-      return addSecurityHeaders(await handleTags(req));
-    }
-    if (url.pathname.startsWith('/api/search')) {
-      return addSecurityHeaders(await handleSearch(req));
-    }
-    if (url.pathname.includes('/likes')) {
-      return addSecurityHeaders(await handleLikes(req));
-    }
-    if (url.pathname.startsWith('/api/media') || url.pathname.startsWith('/media/')) {
-      return addSecurityHeaders(await handleMedia(req));
-    }
-    if (url.pathname === '/sitemap.xml') {
-      return addSecurityHeaders(await handleSEO(req));
-    }
+    try {
+      // Route matching
+      if (url.pathname.startsWith('/api/auth/')) {
+        return addSecurityHeaders(await handleAuth(req));
+      }
+      if (url.pathname.startsWith('/api/articles/') || url.pathname === '/api/articles') {
+        return addSecurityHeaders(await handleArticles(req));
+      }
+      if (url.pathname.startsWith('/api/tags')) {
+        return addSecurityHeaders(await handleTags(req));
+      }
+      if (url.pathname.startsWith('/api/search')) {
+        return addSecurityHeaders(await handleSearch(req));
+      }
+      if (url.pathname.includes('/likes')) {
+        return addSecurityHeaders(await handleLikes(req));
+      }
+      if (url.pathname.startsWith('/api/media') || url.pathname.startsWith('/media/')) {
+        return addSecurityHeaders(await handleMedia(req));
+      }
+      if (url.pathname === '/sitemap.xml') {
+        return addSecurityHeaders(await handleSEO(req));
+      }
 
-    // 404
-    return addSecurityHeaders(Response.json(
-      { success: false, error: 'Not found' },
-      { status: 404, headers: corsHeaders() }
-    ));
+      // 404
+      return addSecurityHeaders(Response.json(
+        { success: false, error: 'Not found' },
+        { status: 404, headers: corsHeaders() }
+      ));
+    } catch (err) {
+      console.error('Unhandled error:', err);
+      return addSecurityHeaders(Response.json(
+        { success: false, error: 'Internal server error' },
+        { status: 500, headers: corsHeaders() }
+      ));
+    }
   },
 });
 
