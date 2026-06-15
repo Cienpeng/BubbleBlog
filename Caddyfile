@@ -1,0 +1,21 @@
+blog.example.com {
+    reverse_proxy bun:3000
+    encode gzip
+
+    rate_limit {
+        zone dynamic {
+            key {remote_host}
+            events 30
+            window 1s
+        }
+    }
+
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    @scanners path /wp-admin* /.env* /admin* /phpmyadmin* /.git*
+    respond @scanners 404
+}
