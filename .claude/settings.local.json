@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(bun --version)",
+      "Bash(bun run *)",
+      "Bash(bunx tsc *)",
+      "Bash(bun x *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
+    ]
+  }
+}

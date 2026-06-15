@@ -63,7 +63,25 @@ function parseFrontmatter(markdown: string): { frontmatter: Frontmatter; content
 
     switch (key) {
       case 'title': frontmatter.title = value as string; break;
-      case 'tags': frontmatter.tags = value as unknown as string[]; break;
+      case 'tags':
+        if (Array.isArray(value)) {
+          frontmatter.tags = value;
+        } else if (typeof value === 'string') {
+          // Try JSON parse for ["a", "b"] style
+          if (value.startsWith('[') && value.endsWith(']')) {
+            try {
+              const parsed = JSON.parse(value);
+              frontmatter.tags = Array.isArray(parsed) ? parsed : [value];
+            } catch {
+              // Fallback: split by comma
+              frontmatter.tags = value.slice(1, -1).split(',').map(s => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
+            }
+          } else {
+            // Simple comma-separated
+            frontmatter.tags = value.split(',').map(s => s.trim()).filter(Boolean);
+          }
+        }
+        break;
       case 'excerpt': frontmatter.excerpt = value as string; break;
       case 'cover': frontmatter.cover = value as string; break;
       case 'date': frontmatter.date = value as string; break;
@@ -95,14 +113,21 @@ function extractTOC(html: string): TOCItem[] {
 
 // Add IDs to headings for TOC linking
 function addHeadingIds(html: string): string {
+  const seen = new Map<string, number>();
   return html.replace(
     /<(h[2-4])>(.*?)<\/\1>/gi,
     (match, tag, text) => {
-      const id = text
+      let id = text
         .replace(/<[^>]+>/g, '')
         .toLowerCase()
         .replace(/[^a-z0-9一-龥]+/g, '-')
-        .replace(/^-+|-+$/g, '');
+        .replace(/^-+|-+$/g, '')
+        || 'heading';
+      const count = seen.get(id) || 0;
+      seen.set(id, count + 1);
+      if (count > 0) {
+        id = `${id}-${count + 1}`;
+      }
       return `<${tag} id="${id}">${text}</${tag}>`;
     }
   );
