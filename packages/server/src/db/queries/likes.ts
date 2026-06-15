@@ -7,22 +7,22 @@ export async function getArticleIdBySlug(slug: string): Promise<number | null> {
 }
 
 export async function toggleLike(articleId: number, fingerprint: string): Promise<LikeInfo> {
-  try {
-    await sql`INSERT INTO likes (article_id, fingerprint) VALUES (${articleId}, ${fingerprint})`;
-  } catch (e: any) {
-    if (!e.message?.includes('duplicate') && !e.message?.includes('unique')) {
-      throw e;
-    }
-  }
-
+  await sql`
+    INSERT INTO likes (article_id, fingerprint)
+    VALUES (${articleId}, ${fingerprint})
+    ON CONFLICT (article_id, fingerprint) DO NOTHING
+  `;
   return getLikeInfo(articleId, fingerprint);
 }
 
 export async function getLikeInfo(articleId: number, fingerprint: string): Promise<LikeInfo> {
-  const countRow = await sql`SELECT COUNT(*)::int as count FROM likes WHERE article_id = ${articleId}`;
-  const likedRow = await sql`SELECT COUNT(*)::int as cnt FROM likes WHERE article_id = ${articleId} AND fingerprint = ${fingerprint}`;
+  const rows = await sql`
+    SELECT
+      COUNT(*)::int as count,
+      COUNT(*) FILTER (WHERE fingerprint = ${fingerprint})::int as liked_count
+    FROM likes WHERE article_id = ${articleId}`;
   return {
-    count: countRow[0].count,
-    liked: likedRow[0].cnt > 0,
+    count: rows[0].count,
+    liked: rows[0].liked_count > 0,
   };
 }

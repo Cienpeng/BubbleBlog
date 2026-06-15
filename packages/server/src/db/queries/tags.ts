@@ -12,24 +12,34 @@ export async function getAllTags(): Promise<Tag[]> {
 }
 
 export async function getOrCreateTags(tagNames: string[]): Promise<Tag[]> {
-  const tags: Tag[] = [];
-  for (const name of tagNames) {
-    const trimmed = name.trim();
-    if (!trimmed) continue;
-    const slug = trimmed.toLowerCase().replace(/[^a-z0-9一-龥]+/g, '-').replace(/^-+|-+$/g, '');
-    let rows = await sql`SELECT * FROM tags WHERE slug = ${slug}`;
-    if (rows.length === 0) {
-      rows = await sql`INSERT INTO tags (name, slug) VALUES (${trimmed}, ${slug}) RETURNING *`;
-    }
-    tags.push(rows[0] as Tag);
-  }
-  return tags;
+  const trimmed = tagNames.map(n => n.trim()).filter(Boolean);
+  if (trimmed.length === 0) return [];
+
+  // Generate slugs
+  const nameSlugPairs = trimmed.map(name => ({
+    name,
+    slug: name.toLowerCase().replace(/[^a-z0-9一-龥]+/g, '-').replace(/^-+|-+$/g, ''),
+  }));
+
+  const slugs = nameSlugPairs.map(p => p.slug);
+
+  // Insert all missing tags in one batch (ignore conflicts)
+  await sql`
+    INSERT INTO tags ${sql(nameSlugPairs.map(p => [p.name, p.slug]))}
+    ON CONFLICT (slug) DO NOTHING
+  `;
+
+  // Fetch all tags (existing + newly created)
+  const rows = await sql`SELECT * FROM tags WHERE slug = ANY(${slugs})`;
+  return rows as Tag[];
 }
 
 export async function setArticleTags(articleId: number, tagIds: number[]): Promise<void> {
   await sql`DELETE FROM article_tags WHERE article_id = ${articleId}`;
   if (tagIds.length > 0) {
-    const values = tagIds.map(tid => `(${articleId}, ${tid})`).join(', ');
-    await sql.unsafe(`INSERT INTO article_tags (article_id, tag_id) VALUES ${values}`);
+    await sql`
+      INSERT INTO article_tags (article_id, tag_id)
+      ${sql(tagIds.map(tid => [articleId, tid]))}
+    `;
   }
 }
