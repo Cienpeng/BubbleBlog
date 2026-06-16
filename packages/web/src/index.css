@@ -1,0 +1,79 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  html {
+    scroll-behavior: smooth;
+  }
+  body {
+    @apply bg-[#f8f9fc] dark:bg-black text-text-primary dark:text-white;
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+  }
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-300 dark:bg-gray-700 rounded-full;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply bg-white/40 dark:bg-white/[0.04] backdrop-blur-[18px] border border-white/70 dark:border-white/[0.08];
+    box-shadow: 0 4px 24px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.6);
+  }
+  .dark .glass {
+    box-shadow: 0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .glass-nav {
+    @apply bg-white/50 dark:bg-white/[0.04] backdrop-blur-[14px] border border-white/70 dark:border-white/[0.08];
+    box-shadow: 0 2px 16px rgba(0,0,0,0.04);
+  }
+  .dark .glass-nav {
+    box-shadow: 0 2px 16px rgba(0,0,0,0.4);
+  }
+  .card-tilt {
+    transition: transform 200ms ease-out, box-shadow 200ms ease-out;
+  }
+  .card-tilt:hover {
+    transform: perspective(1000px) rotateX(2deg) rotateY(-3deg) translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.08);
+  }
+  .dark .card-tilt:hover {
+    box-shadow: 0 12px 40px rgba(0,0,0,0.5);
+  }
+  .heading-organic {
+    @apply inline-block px-7 py-2 text-white font-bold text-center;
+    background: #5DAC81;
+    box-shadow: 0 6px 24px rgba(93,172,129,0.25);
+  }
+  .heading-organic.h1 {
+    @apply text-[28px] font-extrabold px-12 py-5;
+    border-radius: 60% 40% 55% 45% / 45% 55% 45% 55%;
+  }
+  .heading-organic.h2 {
+    @apply text-xl font-extrabold px-7 py-2.5;
+    border-radius: 55% 45% 50% 50% / 42% 50% 58% 58%;
+  }
+  .heading-organic.h3 {
+    @apply text-[17px] font-bold px-6 py-1.5;
+    border-radius: 60% 40% 55% 45% / 50% 55% 45% 50%;
+  }
+  .code-block {
+    @apply bg-[#161616] dark:bg-[#0a0a0a] rounded-2xl overflow-hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+  }
+  .code-block-header {
+    @apply flex justify-between items-center px-4 py-2 bg-[#262626] dark:bg-[#1a1a1a] border-b border-[#333];
+  }
+  .ripple-effect {
+    animation: ripple 150ms ease-in-out;
+  }
+}
