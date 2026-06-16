@@ -1,3 +1,5 @@
+import './env'; // Must be first — loads .env before other modules
+
 import { corsHeaders, handleCors } from './middleware/cors';
 import { globalRateLimit } from './middleware/ratelimit';
 import { handleAuth } from './routes/auth';

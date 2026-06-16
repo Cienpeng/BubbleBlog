@@ -1,3 +1,4 @@
+import '../env'; // Must be first — loads .env before connection
 import sql from './connection';
 
 const migration = `
