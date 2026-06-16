@@ -86,6 +86,42 @@ CREATE TRIGGER trg_search_vector
 
 -- Create GIN index for full text search
 CREATE INDEX IF NOT EXISTS idx_articles_search ON articles USING GIN(search_vector);
+
+-- Site settings (key-value)
+CREATE TABLE IF NOT EXISTS site_settings (
+  key VARCHAR(100) PRIMARY KEY,
+  value TEXT NOT NULL DEFAULT '',
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Carousel images
+CREATE TABLE IF NOT EXISTS carousel_images (
+  id SERIAL PRIMARY KEY,
+  article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
+  image_url VARCHAR(1000) NOT NULL,
+  sort_order INTEGER DEFAULT 0,
+  is_default BOOLEAN DEFAULT false,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_carousel_article ON carousel_images(article_id);
+CREATE INDEX IF NOT EXISTS idx_carousel_default ON carousel_images(is_default) WHERE is_default = true;
+
+-- Insert default background_image setting
+INSERT INTO site_settings (key, value) VALUES ('background_image', '')
+ON CONFLICT (key) DO NOTHING;
+
+-- Insert 5 default carousel wallpapers if none exist
+INSERT INTO carousel_images (image_url, sort_order, is_default)
+SELECT v.url, v.sort_order, true
+FROM (VALUES
+  ('__DEFAULT_GRADIENT_1__', 0),
+  ('__DEFAULT_GRADIENT_2__', 1),
+  ('__DEFAULT_GRADIENT_3__', 2),
+  ('__DEFAULT_GRADIENT_4__', 3),
+  ('__DEFAULT_GRADIENT_5__', 4)
+) AS v(url, sort_order)
+WHERE NOT EXISTS (SELECT 1 FROM carousel_images WHERE is_default = true);
 `;
 
 async function migrate() {
