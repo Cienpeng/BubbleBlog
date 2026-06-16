@@ -7,6 +7,8 @@ import { handleSearch } from './routes/search';
 import { handleLikes } from './routes/likes';
 import { handleMedia } from './routes/media';
 import { handleSEO } from './routes/seo';
+import { handleSettings } from './routes/settings';
+import { handleCarouselAPI } from './routes/carousel-api';
 
 const PORT = parseInt(process.env.PORT || '3000');
 
@@ -53,6 +55,12 @@ Bun.serve({
       // Route matching
       if (url.pathname.startsWith('/api/auth/')) {
         return addSecurityHeaders(await handleAuth(req));
+      }
+      if (url.pathname.startsWith('/api/settings')) {
+        return addSecurityHeaders(await handleSettings(req));
+      }
+      if (url.pathname.includes('/carousel')) {
+        return addSecurityHeaders(await handleCarouselAPI(req));
       }
       if (url.pathname.startsWith('/api/articles/') || url.pathname === '/api/articles') {
         return addSecurityHeaders(await handleArticles(req));
