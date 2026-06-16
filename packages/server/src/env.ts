@@ -3,7 +3,7 @@
 // Priority: CWD/.env < parent/.env < ... < root/.env
 import { join, dirname } from 'path';
 
-function loadOneEnv(filePath: string): boolean {
+async function loadOneEnv(filePath: string): Promise<boolean> {
   const file = Bun.file(filePath);
   if (!(await file.exists())) return false;
 
