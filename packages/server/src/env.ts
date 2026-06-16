@@ -1,11 +1,14 @@
-// Load .env file (Bun doesn't auto-load .env)
+// Load .env files (Bun doesn't auto-load .env)
+// Loads ALL found .env files — later ones override earlier ones
+// Priority: CWD/.env < parent/.env < ... < root/.env
 import { join, dirname } from 'path';
 
-function tryLoadEnv(filePath: string): boolean {
+function loadOneEnv(filePath: string): boolean {
   const file = Bun.file(filePath);
-  if (!file.exists) return false;
+  if (!(await file.exists())) return false;
 
-  const content = file.textSync?.() || '';
+  const content = await file.text();
+  let count = 0;
   for (const line of content.split('\n')) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
@@ -17,55 +20,58 @@ function tryLoadEnv(filePath: string): boolean {
         (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
     }
-    // Don't override existing env vars (system/production vars take priority)
-    if (!process.env[key]) {
-      process.env[key] = value;
-    }
+    // Later files override earlier ones (so root .env wins over server/.env)
+    process.env[key] = value;
+    count++;
   }
-  console.log(`[env] ✅ Loaded: ${filePath}`);
+  console.log(`[env] ✅ Loaded ${count} vars from: ${filePath}`);
   return true;
 }
 
-// Walk up from CWD and from the script's location, looking for .env
-function loadEnv() {
-  // Paths to try, starting from most likely
+// Walk UP from CWD to root, collecting all .env files
+// Load from bottom-to-top so root .env overrides nested ones
+async function loadEnv() {
   const cwd = process.cwd();
-  const paths: string[] = [];
-
-  // Walk up from CWD
   let dir = cwd;
-  for (let i = 0; i < 5; i++) {
-    paths.push(join(dir, '.env'));
+  const envFiles: string[] = [];
+
+  // Collect .env files from CWD up to filesystem root (or 5 levels)
+  for (let i = 0; i < 6; i++) {
+    const envPath = join(dir, '.env');
+    const file = Bun.file(envPath);
+    if (await file.exists()) {
+      envFiles.push(envPath);
+    }
     const parent = dirname(dir);
     if (parent === dir) break;
     dir = parent;
   }
 
-  // Also try script-relative paths via import.meta
-  try {
-    const scriptDir = dirname(new URL(import.meta.url).pathname);
-    // On Windows, remove leading slash from /D:/path
-    const cleanDir = scriptDir.match(/^\/[A-Za-z]:/)
-      ? scriptDir.slice(1)
-      : scriptDir;
-    let sDir = cleanDir;
-    for (let i = 0; i < 4; i++) {
-      const p = join(sDir, '.env');
-      if (!paths.includes(p)) paths.push(p);
-      const parent = dirname(sDir);
-      if (parent === sDir) break;
-      sDir = parent;
-    }
-  } catch {}
+  console.log(`[env] Searching from CWD: ${cwd}`);
 
-  console.log(`[env] Searching for .env, CWD: ${cwd}`);
-
-  for (const p of paths) {
-    if (tryLoadEnv(p)) return;
+  if (envFiles.length === 0) {
+    // Fallback: try script-relative path
+    try {
+      const scriptDir = dirname(new URL(import.meta.url).pathname);
+      const cleanDir = scriptDir.match(/^\/[A-Za-z]:/) ? scriptDir.slice(1) : scriptDir;
+      const rootEnv = join(cleanDir, '..', '..', '..', '.env');
+      if (await Bun.file(rootEnv).exists()) {
+        envFiles.push(rootEnv);
+      }
+    } catch {}
   }
 
-  console.warn(`[env] ❌ No .env found. Tried: ${paths.join(', ')}`);
-  console.warn('[env] Using hardcoded defaults — DB connection will likely fail');
+  if (envFiles.length === 0) {
+    console.warn('[env] ❌ No .env file found, using defaults');
+    return;
+  }
+
+  // Reverse so root-level loads LAST (highest priority)
+  envFiles.reverse();
+
+  for (const p of envFiles) {
+    await loadOneEnv(p);
+  }
 }
 
-loadEnv();
+await loadEnv();
