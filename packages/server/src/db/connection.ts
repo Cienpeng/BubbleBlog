@@ -18,13 +18,13 @@ function getSql() {
   return _sql;
 }
 
-// Proxy that lazily initializes the connection
-const sql = new Proxy({} as ReturnType<typeof postgres>, {
-  get(_, prop) {
-    return getSql()[prop as keyof ReturnType<typeof postgres>];
-  },
-  apply(_, _thisArg, args) {
-    return getSql()(...args);
+// Proxy that lazily initializes the connection on first use
+// Target must be callable (Function) for tagged template support
+const sql = new Proxy(function sqlTag(strings: TemplateStringsArray, ...values: unknown[]) {
+  return (getSql() as any)(strings, ...values);
+}, {
+  get(_target, prop: string) {
+    return (getSql() as any)[prop];
   },
 }) as unknown as ReturnType<typeof postgres>;
 
