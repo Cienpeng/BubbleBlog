@@ -62,6 +62,7 @@ export async function handleArticles(req: Request): Promise<Response> {
 
     const contentType = req.headers.get('Content-Type') || '';
     let markdown: string;
+    let body: any = {};
 
     if (contentType.includes('multipart/form-data')) {
       const formData = await req.formData();
@@ -90,7 +91,7 @@ export async function handleArticles(req: Request): Promise<Response> {
 
       markdown = await file.text();
     } else if (contentType.includes('application/json')) {
-      const body = await req.json();
+      body = await req.json();
       markdown = body.content_md || body.content || '';
       if (!markdown) {
         return Response.json(
@@ -116,9 +117,27 @@ export async function handleArticles(req: Request): Promise<Response> {
 
     await setArticleContentHtml(article.id, rendered.html);
 
+    // Tags from frontmatter
     if (rendered.tags.length > 0) {
       const tags = await getOrCreateTags(rendered.tags);
       await setArticleTags(article.id, tags.map(t => t.id));
+      console.log(`[tags] Set ${tags.length} frontmatter tags for article ${article.id}:`, rendered.tags);
+    }
+
+    // Explicit tags (from editor UI, overrides frontmatter)
+    if (Array.isArray(body.tags)) {
+      const tagNames: string[] = body.tags.filter((t: any) => typeof t === 'string' && t.trim());
+      console.log(`[tags] Explicit tags for article ${article.id}:`, tagNames);
+      if (tagNames.length > 0) {
+        const tags = await getOrCreateTags(tagNames);
+        await setArticleTags(article.id, tags.map(t => t.id));
+        console.log(`[tags] Saved ${tags.length} explicit tags for article ${article.id}`);
+      } else if (body.tags.length === 0) {
+        await setArticleTags(article.id, []);
+        console.log(`[tags] Cleared all tags for article ${article.id}`);
+      }
+    } else {
+      console.log(`[tags] body.tags is not an array:`, typeof body.tags, body.tags);
     }
 
     const created = await getArticleById(article.id);
@@ -195,10 +214,28 @@ export async function handleArticles(req: Request): Promise<Response> {
     if (body.content_md) {
       const rendered = renderMarkdown(body.content_md);
       body.content_html = rendered.html;
+      // Tags from frontmatter
       if (rendered.tags && rendered.tags.length > 0) {
         const tags = await getOrCreateTags(rendered.tags);
         await setArticleTags(id, tags.map(t => t.id));
+        console.log(`[tags] PUT frontmatter tags for ${id}:`, rendered.tags);
       }
+    }
+
+    // Explicit tags (from editor UI, overrides frontmatter)
+    if (Array.isArray(body.tags)) {
+      const tagNames: string[] = body.tags.filter((t: any) => typeof t === 'string' && t.trim());
+      console.log(`[tags] PUT explicit for ${id}:`, tagNames);
+      if (tagNames.length > 0) {
+        const tags = await getOrCreateTags(tagNames);
+        await setArticleTags(id, tags.map(t => t.id));
+        console.log(`[tags] PUT saved ${tags.length} tags for ${id}`);
+      } else if (body.tags.length === 0) {
+        await setArticleTags(id, []);
+        console.log(`[tags] PUT cleared tags for ${id}`);
+      }
+    } else {
+      console.log(`[tags] PUT body.tags type:`, typeof body.tags, JSON.stringify(body.tags));
     }
 
     const article = await updateArticle(id, body);
@@ -210,8 +247,10 @@ export async function handleArticles(req: Request): Promise<Response> {
       await setArticleContentHtml(id, body.content_html);
     }
 
+    const updated = await getArticleById(id);
+
     return Response.json(
-      { success: true, data: article, newToken: auth.newToken },
+      { success: true, data: updated, newToken: auth.newToken },
       { headers: corsHeaders() }
     );
   }

@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { IconSearch, IconClose } from './Icons';
 
 export default function SearchBar({ initialQuery = '' }: { initialQuery?: string }) {
   const [query, setQuery] = useState(initialQuery);
@@ -15,7 +16,7 @@ export default function SearchBar({ initialQuery = '' }: { initialQuery?: string
   return (
     <form onSubmit={submit} className="w-full max-w-2xl mx-auto">
       <div className="glass rounded-[24px] flex items-center px-5 h-12">
-        <span className="text-lg mr-3">🔍</span>
+        <IconSearch size={17} className="text-gray-400 mr-3 flex-shrink-0" />
         <input
           type="text"
           value={query}
@@ -25,7 +26,7 @@ export default function SearchBar({ initialQuery = '' }: { initialQuery?: string
         />
         {query && (
           <button type="button" onClick={() => setQuery('')} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 ml-2">
-            ✕
+            <IconClose size={16} />
           </button>
         )}
       </div>

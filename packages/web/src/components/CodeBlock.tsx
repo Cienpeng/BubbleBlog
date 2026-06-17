@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { IconCopy, IconCheck } from './Icons';
 
 interface CodeBlockProps {
   language: string;
@@ -20,9 +21,13 @@ export default function CodeBlock({ language, code }: CodeBlockProps) {
         <span className="text-[10px] font-bold tracking-widest text-gray-500 uppercase">{language || 'code'}</span>
         <button
           onClick={copy}
-          className="px-3 py-1 rounded-xl bg-[#3a3a3a] text-gray-300 text-[11px] hover:bg-[#4a4a4a] transition-colors duration-200"
+          className="inline-flex items-center gap-1 px-3 py-1 rounded-xl bg-[#3a3a3a] text-gray-300 text-[11px] hover:bg-[#4a4a4a] transition-colors duration-200"
         >
-          {copied ? '✓ 已复制' : '📋 复制'}
+          {copied ? (
+            <><IconCheck size={12} /> 已复制</>
+          ) : (
+            <><IconCopy size={12} /> 复制</>
+          )}
         </button>
       </div>
       <pre className="!mt-0 !mb-0 !bg-transparent overflow-x-auto">

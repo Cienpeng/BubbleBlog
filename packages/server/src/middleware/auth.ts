@@ -1,7 +1,7 @@
 import { verifyToken, createToken } from '../services/jwt';
 import { getUserByUsername, updateLastActive } from '../db/queries/users';
 
-const SLIDING_WINDOW_MS = 60 * 60 * 1000; // 60 hours
+const SLIDING_WINDOW_MS = 60 * 60 * 60 * 1000; // 60 hours
 
 export async function requireAuth(req: Request): Promise<{ authorized: boolean; response?: Response; newToken?: string }> {
   const authHeader = req.headers.get('Authorization');

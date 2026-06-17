@@ -1,46 +1,42 @@
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import Footer from '@/components/Footer';
+import { useAuth } from '../hooks/useAuth';
+import { IconBubble } from '../components/Icons';
 
 export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { login, isLoggedIn } = useAuth();
 
-  const login = useCallback(async (e: React.FormEvent) => {
+  // Already logged in — redirect to admin
+  if (isLoggedIn) {
+    navigate('/admin', { replace: true });
+  }
+
+  const handleLogin = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
     if (!password) { setError('请输入密码'); return; }
     setLoading(true);
     setError('');
 
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        localStorage.setItem('token', json.data.token);
-        navigate('/');
-      } else {
-        setError(json.error || '密码错误');
-      }
-    } catch {
-      setError('网络错误，请重试');
-    } finally {
-      setLoading(false);
+    const result = await login(password);
+    if (result.success) {
+      navigate('/admin');
+    } else {
+      setError(result.error || '密码错误');
     }
-  }, [password, navigate]);
+    setLoading(false);
+  }, [password, login, navigate]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] px-4">
       <div className="w-full max-w-sm glass rounded-3xl p-8 text-center animate-fade-in">
-        <div className="text-4xl mb-4">🫧</div>
+        <IconBubble size={48} className="text-brand mx-auto mb-4" />
         <h1 className="text-xl font-extrabold text-text-primary dark:text-white mb-6">BubbleBlog</h1>
 
-        <form onSubmit={login} className="space-y-4">
+        <form onSubmit={handleLogin} className="space-y-4">
           <div>
             <input
               type="password"
@@ -60,7 +56,6 @@ export default function LoginPage() {
           </button>
         </form>
       </div>
-      <Footer />
     </div>
   );
 }

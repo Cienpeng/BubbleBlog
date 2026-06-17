@@ -43,3 +43,20 @@ export async function deleteCarouselImage(id: number): Promise<boolean> {
   const result = await sql`DELETE FROM carousel_images WHERE id = ${id}`;
   return result.count > 0;
 }
+
+export async function getAllDefaultCarousel(): Promise<CarouselImage[]> {
+  const rows = await sql`
+    SELECT id, image_url, sort_order
+    FROM carousel_images
+    WHERE is_default = true
+    ORDER BY sort_order`;
+  return rows as CarouselImage[];
+}
+
+export async function addDefaultCarouselImage(imageUrl: string, sortOrder: number = 0): Promise<CarouselImage> {
+  const rows = await sql`
+    INSERT INTO carousel_images (image_url, sort_order, is_default)
+    VALUES (${imageUrl}, ${sortOrder}, true)
+    RETURNING id, image_url, sort_order`;
+  return rows[0] as CarouselImage;
+}

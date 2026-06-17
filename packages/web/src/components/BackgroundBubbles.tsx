@@ -5,13 +5,15 @@ export default function BackgroundBubbles() {
 
   return (
     <div className="fixed inset-0 pointer-events-none overflow-hidden -z-10">
-      {backgroundImage ? (
+      {/* Background base layer — always present */}
+      <div className="absolute inset-0 bg-[#f8f9fc] dark:bg-black" />
+
+      {/* Custom background image (when set) */}
+      {backgroundImage && (
         <div
-          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-100 dark:opacity-20 dark:brightness-[0.2]"
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-90 dark:opacity-30 dark:brightness-[0.4]"
           style={{ backgroundImage: `url(${backgroundImage})` }}
         />
-      ) : (
-        <div className="absolute inset-0 bg-gradient-to-b from-[#f8f9fc] via-[#eef0f5] to-[#e8ecf2] dark:bg-black" />
       )}
 
       <div className="absolute -top-32 -right-20 w-[450px] h-[450px] rounded-full animate-bubble-float opacity-70 dark:opacity-20"

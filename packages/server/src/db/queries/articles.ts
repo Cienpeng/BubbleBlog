@@ -124,39 +124,33 @@ export async function createArticle(input: CreateArticleInput): Promise<Article>
 }
 
 export async function updateArticle(id: number, input: Partial<CreateArticleInput>): Promise<Article | null> {
-  const updates: string[] = [];
-  const values: any[] = [];
+  // Build new values, fall back to existing for optional fields
+  const title = input.title;
+  const content_md = input.content_md;
+  const excerpt = input.excerpt;
+  const cover_image = input.cover_image;
 
-  if (input.title !== undefined) {
-    updates.push(`title = $${updates.length + 1}`);
-    values.push(input.title);
-    const newSlug = generateSlug(input.title);
-    updates.push(`slug = $${updates.length + 1}`);
-    values.push(newSlug);
+  let newSlug: string | undefined;
+  let readingTime: number | undefined;
+  if (content_md !== undefined) {
+    readingTime = Math.max(1, Math.ceil(content_md.length / 400));
   }
-  if (input.content_md !== undefined) {
-    updates.push(`content_md = $${updates.length + 1}`);
-    values.push(input.content_md);
-    const readingTime = Math.max(1, Math.ceil(input.content_md.length / 400));
-    updates.push(`reading_time = $${updates.length + 1}`);
-    values.push(readingTime);
-  }
-  if (input.excerpt !== undefined) {
-    updates.push(`excerpt = $${updates.length + 1}`);
-    values.push(input.excerpt);
-  }
-  if (input.cover_image !== undefined) {
-    updates.push(`cover_image = $${updates.length + 1}`);
-    values.push(input.cover_image);
+  if (title !== undefined) {
+    newSlug = generateSlug(title);
   }
 
-  updates.push(`updated_at = NOW()`);
-  values.push(id);
+  const rows = await sql`
+    UPDATE articles SET
+      updated_at = NOW(),
+      title = COALESCE(${title ?? null}, title),
+      slug = COALESCE(${newSlug ?? null}, slug),
+      content_md = COALESCE(${content_md ?? null}, content_md),
+      reading_time = COALESCE(${readingTime ?? null}, reading_time),
+      excerpt = COALESCE(${excerpt ?? null}, excerpt),
+      cover_image = COALESCE(${cover_image ?? null}, cover_image)
+    WHERE id = ${id}
+    RETURNING *`;
 
-  const rows = await sql.unsafe(
-    `UPDATE articles SET ${updates.join(', ')} WHERE id = $${values.length} RETURNING *`,
-    values
-  );
   return rows.length > 0 ? (rows[0] as Article) : null;
 }
 
@@ -185,9 +179,21 @@ export async function deleteArticle(id: number): Promise<boolean> {
   return result.count > 0;
 }
 
-export async function getArticleById(id: number): Promise<Article | null> {
+export async function getArticleById(id: number): Promise<ArticleWithTags | null> {
   const rows = await sql`SELECT * FROM articles WHERE id = ${id}`;
-  return rows.length > 0 ? (rows[0] as Article) : null;
+  if (rows.length === 0) return null;
+
+  const article = rows[0];
+
+  const tagRows = await sql`
+    SELECT t.id, t.name, t.slug FROM tags t
+    JOIN article_tags at2 ON t.id = at2.tag_id
+    WHERE at2.article_id = ${id}`;
+
+  return {
+    ...article,
+    tags: tagRows.map(t => ({ id: t.id, name: t.name, slug: t.slug })),
+  } as ArticleWithTags;
 }
 
 export async function getAllArticles(): Promise<Article[]> {

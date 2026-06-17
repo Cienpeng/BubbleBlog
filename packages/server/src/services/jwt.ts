@@ -1,5 +1,5 @@
 const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-const JWT_EXPIRY_MS = 60 * 60 * 1000; // 60 hours for the token itself
+const JWT_EXPIRY_MS = 60 * 60 * 60 * 1000; // 60 hours for the token itself
 
 interface TokenPayload {
   username: string;

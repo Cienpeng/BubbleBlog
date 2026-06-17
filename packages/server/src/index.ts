@@ -11,6 +11,9 @@ import { handleMedia } from './routes/media';
 import { handleSEO } from './routes/seo';
 import { handleSettings } from './routes/settings';
 import { handleCarouselAPI } from './routes/carousel-api';
+import { handleTracking } from './routes/tracking';
+import { handleStatsAPI } from './routes/stats-api';
+import { handleProfile } from './routes/profile';
 
 const PORT = parseInt(process.env.PORT || '3000');
 
@@ -81,6 +84,15 @@ Bun.serve({
       }
       if (url.pathname === '/sitemap.xml') {
         return addSecurityHeaders(await handleSEO(req));
+      }
+      if (url.pathname.startsWith('/api/admin/stats')) {
+        return addSecurityHeaders(await handleStatsAPI(req));
+      }
+      if (url.pathname.startsWith('/api/admin/profile') || url.pathname === '/api/admin/password' || url.pathname === '/api/profile') {
+        return addSecurityHeaders(await handleProfile(req));
+      }
+      if (url.pathname.startsWith('/api/track')) {
+        return addSecurityHeaders(await handleTracking(req));
       }
 
       // 404

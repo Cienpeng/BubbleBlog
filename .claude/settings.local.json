@@ -15,7 +15,8 @@
       "Bash(curl -s -X POST http://localhost:3000/api/auth/setup -H 'Content-Type: application/json' -d '{\"password\":\"testpass123\"}')",
       "Bash(kill %1)",
       "Bash(pkill -f \"bun run src/index.ts\")",
-      "Bash(taskkill //F //IM \"bun.exe\")"
+      "Bash(taskkill //F //IM \"bun.exe\")",
+      "Bash(bun build *)"
     ]
   }
 }

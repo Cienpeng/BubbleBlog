@@ -1,5 +1,6 @@
 import { corsHeaders, handleCors } from '../middleware/cors';
-import { getAllSettings } from '../db/queries/settings';
+import { requireAuth } from '../middleware/auth';
+import { getAllSettings, setSetting } from '../db/queries/settings';
 
 export async function handleSettings(req: Request): Promise<Response> {
   const corsResponse = handleCors(req);
@@ -13,8 +14,27 @@ export async function handleSettings(req: Request): Promise<Response> {
     return Response.json({ success: true, data: settings }, { headers: corsHeaders() });
   }
 
-  // PUT /api/settings — protected (admin only, future)
-  // Will be added in admin-panel phase
+  // PUT /api/settings — admin only
+  if (url.pathname === '/api/settings' && req.method === 'PUT') {
+    const auth = await requireAuth(req);
+    if (!auth.authorized) return auth.response!;
+
+    const body = await req.json();
+    const updates: Record<string, string> = {};
+
+    if (typeof body.background_image === 'string') {
+      await setSetting('background_image', body.background_image);
+      updates.background_image = body.background_image;
+    }
+
+    // Extensible: add more settings keys here as needed
+
+    const settings = await getAllSettings();
+    return Response.json(
+      { success: true, data: settings, newToken: auth.newToken },
+      { headers: corsHeaders() }
+    );
+  }
 
   return Response.json(
     { success: false, error: 'Not found' },
