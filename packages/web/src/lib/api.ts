@@ -45,4 +45,17 @@ export const adminApi = {
   put: <T>(url: string, body?: unknown) =>
     adminRequest<T>(url, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   delete: <T>(url: string) => adminRequest<T>(url, { method: 'DELETE' }),
+  upload: <T>(url: string, formData: FormData) => {
+    const token = localStorage.getItem('token');
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return fetch(`${url}`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    }).then(res => res.json()).then(json => {
+      if (!json.success) throw new Error(json.error || 'Upload failed');
+      return { data: json.data as T, newToken: json.newToken };
+    });
+  }
 };

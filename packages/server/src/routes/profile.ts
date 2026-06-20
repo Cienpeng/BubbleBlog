@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth';
 import { verifyToken } from '../services/jwt';
 import { getUserProfile, updateUserProfile, setUserTags, updatePassword } from '../db/queries/profile';
 import { getOrCreateTags } from '../db/queries/tags';
+import { deleteLocalMedia } from './media';
 
 async function getUserId(req: Request): Promise<{ userId: number; username: string } | null> {
   const authHeader = req.headers.get('Authorization');
@@ -61,6 +62,14 @@ export async function handleProfile(req: Request): Promise<Response> {
 
     const payload = await getUserId(req);
     const body = await req.json();
+
+    // Clean up old avatar if it's being changed
+    const currentProfile = await getUserProfile(payload.userId);
+    const oldAvatar = currentProfile?.avatar_url;
+    const newAvatar = body.avatar_url;
+    if (oldAvatar && oldAvatar !== newAvatar) {
+      await deleteLocalMedia(oldAvatar);
+    }
 
     await updateUserProfile(payload.userId, {
       display_name: body.display_name,

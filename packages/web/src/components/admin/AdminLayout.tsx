@@ -2,6 +2,8 @@ import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { IconBubble, IconHome } from '@/components/Icons';
 import CommandPalette from './CommandPalette';
+import ThemeToggle from '@/components/ThemeToggle';
+
 
 const TABS = [
   { path: '/admin', label: '文章管理', exact: true },
@@ -62,6 +64,7 @@ export default function AdminLayout() {
               <IconHome size={14} />
               前台
             </button>
+            <ThemeToggle />
             <button
               onClick={handleLogout}
               className="px-3 py-1.5 rounded-xl text-xs font-medium text-gray-500 dark:text-white/40 hover:text-like transition-colors"

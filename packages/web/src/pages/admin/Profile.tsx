@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { adminApi } from '@/lib/api';
 import { IconSave, IconUser } from '@/components/Icons';
+import ImageCropperModal from '@/components/admin/ImageCropperModal';
+
 
 interface UserProfile {
   id: number;
@@ -29,6 +31,10 @@ export default function Profile() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState('');
 
+  const avatarInputRef = useRef<HTMLInputElement | null>(null);
+  const [cropperOpen, setCropperOpen] = useState(false);
+  const [cropperSrc, setCropperSrc] = useState('');
+
   // Password form
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -55,6 +61,39 @@ export default function Profile() {
   }, [updateToken]);
 
   useEffect(() => { fetchProfile(); }, [fetchProfile]);
+
+  const handleAvatarFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setCropperSrc(reader.result);
+        setCropperOpen(true);
+      }
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleAvatarCrop = async (blob: Blob) => {
+    setCropperOpen(false);
+    setSavingProfile(true);
+    setProfileMsg('正在上传头像...');
+    try {
+      const formData = new FormData();
+      formData.append('file', blob, 'avatar.jpg');
+      const { data, newToken } = await adminApi.upload<{ filename: string }>('/api/media/upload', formData);
+      if (newToken) updateToken(newToken);
+      setAvatarUrl(`/media/${data.filename}`);
+      setProfileMsg('头像已生成，保存资料后生效');
+      setTimeout(() => setProfileMsg(''), 3000);
+    } catch (err: any) {
+      setProfileMsg(err.message || '头像上传失败');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
 
   // Save profile
   const saveProfile = async (e: React.FormEvent) => {
@@ -154,7 +193,11 @@ export default function Profile() {
         <div>
           <label className="text-xs font-medium text-gray-400 mb-1.5 block">头像</label>
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.05] flex-shrink-0">
+            <div 
+              onClick={() => avatarInputRef.current?.click()}
+              className="relative w-16 h-16 rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.05] flex-shrink-0 cursor-pointer group/avatar hover:border-brand/30 transition-all"
+              title="点击上传本地头像"
+            >
               {avatarUrl ? (
                 <img src={avatarUrl} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
               ) : (
@@ -162,13 +205,36 @@ export default function Profile() {
                   <IconUser size={28} />
                 </div>
               )}
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                <span className="text-[10px] text-white font-bold">更换</span>
+              </div>
             </div>
+
+            <div className="flex-1 flex flex-col gap-2">
+              <input
+                type="text"
+                value={avatarUrl}
+                onChange={e => setAvatarUrl(e.target.value)}
+                placeholder="头像 URL（图床链接）"
+                className="w-full px-4 py-2.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.06] outline-none text-sm text-text-primary dark:text-white/90 placeholder-gray-300 dark:placeholder-gray-600 focus:border-brand/30 transition-colors"
+              />
+              <div className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="text-xs text-brand hover:underline font-bold"
+                >
+                  上传本地图片并裁剪...
+                </button>
+              </div>
+            </div>
+
             <input
-              type="text"
-              value={avatarUrl}
-              onChange={e => setAvatarUrl(e.target.value)}
-              placeholder="头像 URL（图床链接）"
-              className="flex-1 px-4 py-2.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.06] outline-none text-sm text-text-primary dark:text-white/90 placeholder-gray-300 dark:placeholder-gray-600 focus:border-brand/30 transition-colors"
+              type="file"
+              ref={avatarInputRef}
+              accept="image/*"
+              onChange={handleAvatarFileChange}
+              className="hidden"
             />
           </div>
         </div>
@@ -300,6 +366,15 @@ export default function Profile() {
           {savingPw ? '更新中...' : '更新密码'}
         </button>
       </form>
+
+      <ImageCropperModal
+        isOpen={cropperOpen}
+        imageSrc={cropperSrc}
+        cropType="circle"
+        aspectRatio={1}
+        onCrop={handleAvatarCrop}
+        onClose={() => setCropperOpen(false)}
+      />
     </div>
   );
 }

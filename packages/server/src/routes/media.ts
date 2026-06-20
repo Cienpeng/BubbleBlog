@@ -2,6 +2,7 @@ import { corsHeaders, handleCors } from '../middleware/cors';
 import { requireAuth } from '../middleware/auth';
 import sql from '../db/connection';
 import { join } from 'path';
+import { unlink } from 'fs/promises';
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -84,3 +85,24 @@ export async function handleMedia(req: Request): Promise<Response> {
 
   return Response.json({ success: false, error: 'Not found' }, { status: 404, headers: corsHeaders() });
 }
+
+export async function deleteLocalMedia(url: string | null | undefined): Promise<void> {
+  if (!url || !url.startsWith('/media/')) return;
+  const filename = url.replace('/media/', '');
+  if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) return;
+  const filepath = join(UPLOAD_DIR, filename);
+  try {
+    const file = Bun.file(filepath);
+    if (await file.exists()) {
+      await unlink(filepath);
+    }
+  } catch (err) {
+    console.error(`Failed to delete file ${filepath}:`, err);
+  }
+  try {
+    await sql`DELETE FROM media WHERE filename = ${filename}`;
+  } catch (err) {
+    console.error(`Failed to delete media record for ${filename}:`, err);
+  }
+}
+

@@ -1,6 +1,8 @@
 import { corsHeaders, handleCors } from '../middleware/cors';
 import { requireAuth } from '../middleware/auth';
-import { getAllSettings, setSetting } from '../db/queries/settings';
+import { getAllSettings, setSetting, getSetting } from '../db/queries/settings';
+import { deleteLocalMedia } from './media';
+
 
 export async function handleSettings(req: Request): Promise<Response> {
   const corsResponse = handleCors(req);
@@ -23,6 +25,10 @@ export async function handleSettings(req: Request): Promise<Response> {
     const updates: Record<string, string> = {};
 
     if (typeof body.background_image === 'string') {
+      const currentBg = await getSetting('background_image');
+      if (currentBg && currentBg !== body.background_image) {
+        await deleteLocalMedia(currentBg);
+      }
       await setSetting('background_image', body.background_image);
       updates.background_image = body.background_image;
     }

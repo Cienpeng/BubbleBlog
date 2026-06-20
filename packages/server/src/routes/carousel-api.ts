@@ -2,6 +2,9 @@ import { corsHeaders, handleCors } from '../middleware/cors';
 import { requireAuth } from '../middleware/auth';
 import { getCarouselForArticle, addCarouselImage, deleteCarouselImage } from '../db/queries/carousel';
 import { getAllDefaultCarousel, addDefaultCarouselImage } from '../db/queries/carousel';
+import { deleteLocalMedia } from './media';
+import sql from '../db/connection';
+
 
 export async function handleCarouselAPI(req: Request): Promise<Response> {
   const corsResponse = handleCors(req);
@@ -54,6 +57,19 @@ export async function handleCarouselAPI(req: Request): Promise<Response> {
       );
     }
 
+    // Enforce 5 default carousel images limit
+    const defaults = await sql`
+      SELECT id, image_url
+      FROM carousel_images
+      WHERE is_default = true
+      ORDER BY sort_order ASC, id ASC
+    `;
+    if (defaults.length >= 5) {
+      const oldest = defaults[0];
+      await deleteLocalMedia(oldest.image_url);
+      await sql`DELETE FROM carousel_images WHERE id = ${oldest.id}`;
+    }
+
     const image = await addDefaultCarouselImage(imageUrl, body.sort_order ?? 0);
     return Response.json(
       { success: true, data: image, newToken: auth.newToken },
@@ -67,7 +83,12 @@ export async function handleCarouselAPI(req: Request): Promise<Response> {
     const auth = await requireAuth(req);
     if (!auth.authorized) return auth.response!;
 
-    const deleted = await deleteCarouselImage(parseInt(deleteMatch[1]));
+    const id = parseInt(deleteMatch[1]);
+    const imgRows = await sql`SELECT image_url FROM carousel_images WHERE id = ${id}`;
+    if (imgRows.length > 0) {
+      await deleteLocalMedia(imgRows[0].image_url);
+    }
+    const deleted = await deleteCarouselImage(id);
     if (!deleted) {
       return Response.json(
         { success: false, error: 'Image not found' },
