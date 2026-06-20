@@ -19,60 +19,78 @@ export default function Navbar({ onSearchClick }: NavbarProps) {
     return () => window.removeEventListener('scroll', onScroll);
   }, []);
 
-  const linkClass = (path: string) =>
-    `text-sm transition-all duration-200 font-medium ${
-      location.pathname === path
-        ? 'text-brand dark:text-brand-light'
-        : 'text-gray-800 dark:text-white/90 hover:text-brand dark:hover:text-brand-light'
-    }`;
-
   return (
-    <nav
-      className={`sticky top-0 z-50 mx-4 mt-3 px-6 py-3 rounded-[40px] transition-all duration-500 ${
+    <header
+      className={`sticky top-0 z-50 w-full transition-all duration-300 ${
         scrolled
-          ? 'glass-nav scale-[0.985]'
-          : 'glass-nav-clear hover:scale-[1.005]'
+          ? 'bg-white/75 dark:bg-black/75 backdrop-blur-[20px] border-b border-black/[0.05] dark:border-white/[0.08] shadow-sm'
+          : 'bg-transparent border-b border-transparent'
       }`}
     >
-      <div className="flex items-center justify-between max-w-7xl mx-auto">
-        <Link to="/" className="flex items-center gap-2 group">
-          <IconBubble className="text-brand transition-transform duration-300 group-hover:scale-125 group-hover:rotate-12" size={22} />
-          <span className="font-extrabold text-lg bg-gradient-to-r from-brand to-purple-500 bg-clip-text text-transparent">
-            BubbleBlog
+      <div className="max-w-[1360px] mx-auto px-8 sm:px-12 h-16 flex items-center justify-between">
+        {/* Brand Logo */}
+        <Link to="/" className="flex items-center gap-2.5 group">
+          <div className="w-8 h-8 rounded-xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center border border-brand/20 transition-all duration-300 group-hover:scale-105 group-hover:bg-brand/15">
+            <IconBubble className="text-brand" size={16} />
+          </div>
+          <span className="font-black text-[17px] tracking-tight text-text-primary dark:text-white">
+            Bubble<span className="text-brand dark:text-brand-light">Blog</span>
           </span>
         </Link>
 
-        <div className="hidden sm:flex items-center gap-6">
-          <Link to="/" className={`${linkClass('/')} hover:scale-105`}>首页</Link>
+        {/* Desktop Navigation Links */}
+        <div className="hidden sm:flex items-center gap-1">
+          <Link
+            to="/"
+            className={`text-sm px-3.5 py-1.5 rounded-full font-medium transition-all duration-300 ${
+              location.pathname === '/'
+                ? 'bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand-light'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-primary dark:hover:text-white'
+            }`}
+          >
+            首页
+          </Link>
+          
           <button
             onClick={onSearchClick}
-            className={`${linkClass('/search')} hover:scale-105 bg-transparent border-none cursor-pointer inline-flex items-center gap-1`}
+            className="text-sm px-3.5 py-1.5 rounded-full font-medium text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-primary dark:hover:text-white transition-all duration-300 flex items-center gap-1.5"
           >
-            <IconSearch size={15} />
+            <IconSearch size={14} className="text-gray-400 dark:text-gray-500" />
             搜索
           </button>
-          {isLoggedIn ? (
+          
+          {isLoggedIn && (
             <Link
               to="/admin"
-              className={`text-sm px-4 py-1.5 rounded-[20px] transition-all duration-200 hover:scale-105 font-medium ${
+              className={`text-sm px-3.5 py-1.5 rounded-full font-medium transition-all duration-300 ${
                 location.pathname.startsWith('/admin')
-                  ? 'bg-brand/10 text-brand'
-                  : 'text-gray-800 dark:text-white/90 hover:bg-black/5 dark:hover:bg-white/5'
+                  ? 'bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand-light'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-primary dark:hover:text-white'
               }`}
             >
               管理
             </Link>
-          ) : null}
+          )}
+
+          {/* Vertical Divider line */}
+          <div className="w-[1px] h-4 bg-black/[0.08] dark:bg-white/[0.08] mx-2" />
+
+          {/* Theme Switcher Toggle */}
           <ThemeToggle />
         </div>
 
-        <div className="sm:hidden flex items-center gap-3">
-          <ThemeToggle />
-          <button onClick={onSearchClick} className="hover:scale-110 transition-transform">
-            <IconSearch size={20} className="text-gray-800 dark:text-white/90" />
+        {/* Mobile Navigation controls */}
+        <div className="sm:hidden flex items-center gap-2">
+          <button
+            onClick={onSearchClick}
+            className="w-9 h-9 flex items-center justify-center rounded-full text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-300"
+            aria-label="搜索"
+          >
+            <IconSearch size={18} />
           </button>
+          <ThemeToggle />
         </div>
       </div>
-    </nav>
+    </header>
   );
 }

@@ -1,3 +1,5 @@
+import { corsHeaders } from './cors';
+
 interface RateLimitEntry {
   count: number;
   resetAt: number;
@@ -55,7 +57,7 @@ export function globalRateLimit(req: Request): Response | null {
   if (!result.allowed) {
     return Response.json(
       { success: false, error: 'Too many requests' },
-      { status: 429, headers: { 'Retry-After': String(result.retryAfter) } }
+      { status: 429, headers: { 'Retry-After': String(result.retryAfter), ...corsHeaders() } }
     );
   }
   return null;
@@ -67,7 +69,7 @@ export function loginRateLimit(req: Request): Response | null {
   if (!result.allowed) {
     return Response.json(
       { success: false, error: 'Too many login attempts, try again later' },
-      { status: 429, headers: { 'Retry-After': String(result.retryAfter) } }
+      { status: 429, headers: { 'Retry-After': String(result.retryAfter), ...corsHeaders() } }
     );
   }
   return null;
@@ -78,7 +80,7 @@ export function likeRateLimit(fingerprint: string): Response | null {
   if (!result.allowed) {
     return Response.json(
       { success: false, error: 'Too many like requests' },
-      { status: 429, headers: { 'Retry-After': String(result.retryAfter) } }
+      { status: 429, headers: { 'Retry-After': String(result.retryAfter), ...corsHeaders() } }
     );
   }
   return null;

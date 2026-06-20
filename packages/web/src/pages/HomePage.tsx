@@ -165,9 +165,9 @@ export default function HomePage() {
   }
 
   return (
-    <div className="max-w-8xl mx-auto px-6 sm:px-8 py-8">
-      <div className="flex flex-col lg:flex-row gap-12 lg:gap-16">
-        <div className="flex-1 lg:w-[72%]">
+    <div className="max-w-[1360px] mx-auto px-8 sm:px-12 pt-[22vh] sm:pt-[26vh] pb-8">
+      <div className="flex flex-col lg:flex-row gap-16 lg:gap-20">
+        <div className="flex-1 lg:w-[75%]">
           <BentoGrid>
             {articles.map((article, i) => {
               const variant = i === 0 ? 'feature' : i <= 2 ? 'normal' : 'compact';
@@ -177,7 +177,7 @@ export default function HomePage() {
                   key={article.id}
                   article={article}
                   variant={variant}
-                  rotation={ROTATIONS[i] || 0}
+                  rotation={0}
                   style={isFeature ? { gridColumn: 'span 2' } : undefined}
                   isHovered={hoveredId === article.id}
                   isDimmed={hoveredId !== null && hoveredId !== article.id}
@@ -213,30 +213,44 @@ export default function HomePage() {
           </div>
         </div>
 
-        <aside className="lg:w-[28%] flex-shrink-0 space-y-4">
-          <GlassCard className="p-6 text-center">
+        <aside className="lg:w-[25%] flex-shrink-0 space-y-4">
+          <GlassCard className="p-6 text-center relative overflow-hidden">
             {author?.avatar_url ? (
-              <img src={author.avatar_url} alt="" className="w-16 h-16 rounded-2xl object-cover mx-auto mb-3" />
+              <div className="relative w-20 h-20 mx-auto mb-4 rounded-full ring-4 ring-brand/15 ring-offset-2 dark:ring-offset-black overflow-hidden shadow-sm">
+                <img src={author.avatar_url} alt="" className="w-full h-full object-cover" />
+              </div>
             ) : (
-              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand to-purple-500 mx-auto mb-3 flex items-center justify-center">
-                <IconUser size={28} className="text-white/70" />
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-brand/20 to-purple-500/20 ring-4 ring-brand/15 ring-offset-2 dark:ring-offset-black mx-auto mb-4 flex items-center justify-center shadow-sm">
+                <IconUser size={30} className="text-brand dark:text-brand-light" />
               </div>
             )}
-            <h3 className="font-bold text-lg text-text-primary dark:text-white">
+            <h3 className="font-black text-lg text-text-primary dark:text-white">
               {author?.display_name || '作者'}
             </h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 px-2">
               {author?.bio || '技术写作者'}
             </p>
             {author?.tags && author.tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 justify-center mt-3">
+              <div className="flex flex-wrap gap-1 justify-center mt-3.5">
                 {author.tags.map(t => (
-                  <span key={t.id} className="px-2 py-0.5 rounded-full text-[10px] bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand-light">
+                  <span key={t.id} className="px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wide bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand-light">
                     {t.name}
                   </span>
                 ))}
               </div>
             )}
+
+            {/* Writer Stats Counter Grid */}
+            <div className="grid grid-cols-2 gap-4 pt-4 mt-5 border-t border-black/[0.04] dark:border-white/[0.04] text-center">
+              <div>
+                <div className="text-lg font-black text-brand dark:text-brand-light">{articles.length}</div>
+                <div className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">文章数</div>
+              </div>
+              <div>
+                <div className="text-lg font-black text-brand dark:text-brand-light">{tags.length}</div>
+                <div className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">标签分类</div>
+              </div>
+            </div>
           </GlassCard>
 
           <TagCloud tags={tags} />

@@ -1,5 +1,6 @@
 import { verifyToken, createToken } from '../services/jwt';
 import { getUserByUsername, updateLastActive } from '../db/queries/users';
+import { corsHeaders } from './cors';
 
 const SLIDING_WINDOW_MS = 60 * 60 * 60 * 1000; // 60 hours
 
@@ -8,7 +9,10 @@ export async function requireAuth(req: Request): Promise<{ authorized: boolean; 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return {
       authorized: false,
-      response: Response.json({ success: false, error: 'Unauthorized' }, { status: 401 }),
+      response: Response.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401, headers: corsHeaders() }
+      ),
     };
   }
 
@@ -18,7 +22,10 @@ export async function requireAuth(req: Request): Promise<{ authorized: boolean; 
   if (!payload) {
     return {
       authorized: false,
-      response: Response.json({ success: false, error: 'Invalid or expired token' }, { status: 401 }),
+      response: Response.json(
+        { success: false, error: 'Invalid or expired token' },
+        { status: 401, headers: corsHeaders() }
+      ),
     };
   }
 
@@ -27,7 +34,10 @@ export async function requireAuth(req: Request): Promise<{ authorized: boolean; 
   if (!user) {
     return {
       authorized: false,
-      response: Response.json({ success: false, error: 'User not found' }, { status: 401 }),
+      response: Response.json(
+        { success: false, error: 'User not found' },
+        { status: 401, headers: corsHeaders() }
+      ),
     };
   }
 
@@ -37,7 +47,10 @@ export async function requireAuth(req: Request): Promise<{ authorized: boolean; 
   if (now - lastActive > SLIDING_WINDOW_MS) {
     return {
       authorized: false,
-      response: Response.json({ success: false, error: 'Session expired, please login again' }, { status: 401 }),
+      response: Response.json(
+        { success: false, error: 'Session expired, please login again' },
+        { status: 401, headers: corsHeaders() }
+      ),
     };
   }
 

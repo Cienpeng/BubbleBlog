@@ -38,7 +38,7 @@ export default function TagPage() {
               key={a.id}
               article={a}
               variant="normal"
-              rotation={i % 2 === 0 ? 0.5 : -0.5}
+              rotation={0}
               isHovered={hoveredId === a.id}
               isDimmed={hoveredId !== null && hoveredId !== a.id}
               onHover={(h) => setHoveredId(h ? a.id : null)}
