@@ -7,7 +7,7 @@ import OrganicHeading from '@/components/OrganicHeading';
 import BackToTop from '@/components/BackToTop';
 import { IconArrowLeft, IconCalendar, IconClock, IconTag, IconCopy, IconCheck } from '@/components/Icons';
 import LikeButton from '@/components/LikeButton';
-import Footer from '@/components/Footer';
+
 
 function getFingerprint(): string {
   const stored = sessionStorage.getItem('_fp');
@@ -140,7 +140,7 @@ export default function ArticlePage() {
   }
 
   return (
-    <div className="bg-[#f8f9fc] dark:bg-black min-h-screen">
+    <div className="bg-[#f8f9fc] dark:bg-black min-h-screen rounded-[32px] md:rounded-[40px] mt-5 mb-8 shadow-lg border border-black/[0.03] dark:border-white/[0.05]">
       <article className="max-w-[88vw] mx-auto px-4 py-6">
         {/* Back button */}
         <div className="mb-4">
@@ -265,7 +265,6 @@ export default function ArticlePage() {
       </article>
 
       <BackToTop />
-      <Footer />
     </div>
   );
 }

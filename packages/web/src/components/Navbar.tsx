@@ -20,17 +20,17 @@ export default function Navbar({ onSearchClick }: NavbarProps) {
   }, []);
 
   return (
-    <header
-      className={`sticky top-0 z-50 w-full transition-all duration-300 ${
+    <nav
+      className={`sticky top-0 z-50 mx-4 mt-3 px-6 py-3 rounded-[32px] transition-all duration-300 ${
         scrolled
-          ? 'bg-white/75 dark:bg-black/75 backdrop-blur-[20px] border-b border-black/[0.05] dark:border-white/[0.08] shadow-sm'
-          : 'bg-transparent border-b border-transparent'
+          ? 'bg-white/80 dark:bg-black/75 backdrop-blur-[20px] border border-black/[0.06] dark:border-white/[0.08] shadow-lg'
+          : 'bg-white dark:bg-zinc-900 border border-black/[0.08] dark:border-white/[0.12] shadow-sm'
       }`}
     >
-      <div className="max-w-[1360px] mx-auto px-8 sm:px-12 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Brand Logo */}
         <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center border border-brand/20 transition-all duration-300 group-hover:scale-105 group-hover:bg-brand/15">
+          <div className="w-8 h-8 rounded-xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center border border-brand/20 transition-all duration-300 group-hover:scale-105">
             <IconBubble className="text-brand" size={16} />
           </div>
           <span className="font-black text-[17px] tracking-tight text-text-primary dark:text-white">
@@ -39,13 +39,13 @@ export default function Navbar({ onSearchClick }: NavbarProps) {
         </Link>
 
         {/* Desktop Navigation Links */}
-        <div className="hidden sm:flex items-center gap-1">
+        <div className="hidden sm:flex items-center gap-1.5">
           <Link
             to="/"
-            className={`text-sm px-3.5 py-1.5 rounded-full font-medium transition-all duration-300 ${
+            className={`text-sm px-4 py-1.5 rounded-full text-black dark:text-white transition-all duration-300 ${
               location.pathname === '/'
-                ? 'bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand-light'
-                : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-primary dark:hover:text-white'
+                ? 'bg-black/5 dark:bg-white/10 font-bold'
+                : 'font-medium hover:bg-black/5 dark:hover:bg-white/5'
             }`}
           >
             首页
@@ -53,19 +53,19 @@ export default function Navbar({ onSearchClick }: NavbarProps) {
           
           <button
             onClick={onSearchClick}
-            className="text-sm px-3.5 py-1.5 rounded-full font-medium text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-primary dark:hover:text-white transition-all duration-300 flex items-center gap-1.5"
+            className="text-sm px-4 py-1.5 rounded-full text-black dark:text-white font-medium hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-300 flex items-center gap-1.5"
           >
-            <IconSearch size={14} className="text-gray-400 dark:text-gray-500" />
+            <IconSearch size={14} className="text-black dark:text-white" />
             搜索
           </button>
           
           {isLoggedIn && (
             <Link
               to="/admin"
-              className={`text-sm px-3.5 py-1.5 rounded-full font-medium transition-all duration-300 ${
+              className={`text-sm px-4 py-1.5 rounded-full text-black dark:text-white transition-all duration-300 ${
                 location.pathname.startsWith('/admin')
-                  ? 'bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand-light'
-                  : 'text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 hover:text-text-primary dark:hover:text-white'
+                  ? 'bg-black/5 dark:bg-white/10 font-bold'
+                  : 'font-medium hover:bg-black/5 dark:hover:bg-white/5'
               }`}
             >
               管理
@@ -83,7 +83,7 @@ export default function Navbar({ onSearchClick }: NavbarProps) {
         <div className="sm:hidden flex items-center gap-2">
           <button
             onClick={onSearchClick}
-            className="w-9 h-9 flex items-center justify-center rounded-full text-gray-600 dark:text-gray-300 hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-300"
+            className="w-9 h-9 flex items-center justify-center rounded-full text-black dark:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-300"
             aria-label="搜索"
           >
             <IconSearch size={18} />
@@ -91,6 +91,6 @@ export default function Navbar({ onSearchClick }: NavbarProps) {
           <ThemeToggle />
         </div>
       </div>
-    </header>
+    </nav>
   );
 }
