@@ -30,8 +30,8 @@ export default function Navbar({ onSearchClick }: NavbarProps) {
     <nav
       className={`sticky top-0 z-50 mx-4 mt-3 px-6 py-3 rounded-[40px] transition-all duration-500 ${
         scrolled
-          ? 'glass-nav backdrop-blur-[20px] shadow-lg scale-[0.985]'
-          : 'bg-white/30 dark:bg-white/[0.02] backdrop-blur-[12px] border border-white/50 dark:border-white/[0.04] hover:scale-[1.005]'
+          ? 'glass-nav scale-[0.985]'
+          : 'glass-nav-clear hover:scale-[1.005]'
       }`}
     >
       <div className="flex items-center justify-between max-w-7xl mx-auto">

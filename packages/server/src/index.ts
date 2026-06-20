@@ -45,7 +45,7 @@ Bun.serve({
 
     // Health check (no rate limit)
     if (url.pathname === '/api/health') {
-      return addSecurityHeaders(Response.json({ success: true, data: { status: 'ok' } }));
+      return addSecurityHeaders(Response.json({ success: true, data: { status: 'ok', timestamp: Date.now() } }));
     }
 
     // Global rate limit

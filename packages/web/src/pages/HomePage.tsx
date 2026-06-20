@@ -6,7 +6,7 @@ import BentoGrid from '@/components/BentoGrid';
 import ArticleCard from '@/components/ArticleCard';
 import TagCloud from '@/components/TagCloud';
 import GlassCard from '@/components/GlassCard';
-import { IconUser } from '@/components/Icons';
+import { IconUser, IconCalendar } from '@/components/Icons';
 
 const ROTATIONS = [-0.3, 0.8, -1.0, 0.4, -0.6, 0.3, -0.7, 0.5, -0.4, 0.2];
 
@@ -15,6 +15,102 @@ interface AuthorInfo {
   bio: string;
   avatar_url: string;
   tags: { id: number; name: string; slug: string }[];
+}
+
+function CalendarCard() {
+  const [date, setDate] = useState<Date | null>(null);
+
+  useEffect(() => {
+    fetch('/api/health')
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success && res.data && typeof res.data.timestamp === 'number') {
+          setDate(new Date(res.data.timestamp));
+        } else {
+          setDate(new Date());
+        }
+      })
+      .catch(() => {
+        setDate(new Date());
+      });
+  }, []);
+
+  if (!date) {
+    return (
+      <GlassCard className="p-5 flex items-center justify-center h-48 animate-pulse">
+        <div className="text-gray-400 dark:text-gray-500 text-sm">加载日历中...</div>
+      </GlassCard>
+    );
+  }
+
+  // Convert client-calculated UTC milliseconds to GMT+8 (Beijing Time)
+  const utcMillis = date.getTime() + date.getTimezoneOffset() * 60000;
+  const bjMillis = utcMillis + 8 * 3600000;
+  const bjDate = new Date(bjMillis);
+
+  const year = bjDate.getUTCFullYear();
+  const month = bjDate.getUTCMonth();
+  const todayDay = bjDate.getUTCDate();
+
+  const firstDayOfMonth = new Date(Date.UTC(year, month, 1));
+  const startDayOfWeek = firstDayOfMonth.getUTCDay();
+
+  const daysInMonth = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+
+  const blanks = Array(startDayOfWeek).fill(null);
+  const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+  const calendarCells = [...blanks, ...days];
+
+  const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  return (
+    <GlassCard className="p-5">
+      <div className="flex items-center justify-center gap-2 mb-4">
+        <IconCalendar size={16} className="text-brand dark:text-brand-light" />
+        <span className="font-extrabold text-sm text-text-primary dark:text-white tracking-wider">
+          {year}/{pad(month + 1)}/{pad(todayDay)}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-7 gap-y-2 text-center text-xs">
+        {weekdays.map((w, idx) => (
+          <span
+            key={w}
+            className={`font-semibold pb-1.5 border-b border-gray-100 dark:border-white/[0.06] ${
+              idx === 0 || idx === 6
+                ? 'text-gray-400 dark:text-gray-500'
+                : 'text-gray-600 dark:text-gray-400'
+            }`}
+          >
+            {w}
+          </span>
+        ))}
+
+        {calendarCells.map((day, idx) => {
+          if (day === null) {
+            return <div key={`empty-${idx}`} />;
+          }
+
+          const isToday = day === todayDay;
+
+          return (
+            <div key={`day-${day}`} className="flex items-center justify-center py-1">
+              <span
+                className={`w-7 h-7 flex items-center justify-center text-xs transition-all duration-300 rounded-full ${
+                  isToday
+                    ? 'bg-brand text-white font-bold shadow-[0_3px_10px_rgba(93,172,129,0.3)] dark:shadow-[0_3px_10px_rgba(125,217,164,0.2)]'
+                    : 'text-gray-700 dark:text-white/80 hover:bg-black/5 dark:hover:bg-white/5 cursor-default'
+                }`}
+              >
+                {day}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </GlassCard>
+  );
 }
 
 export default function HomePage() {
@@ -69,9 +165,9 @@ export default function HomePage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-8">
-      <div className="flex flex-col lg:flex-row gap-8">
-        <div className="flex-1 lg:w-[65%]">
+    <div className="max-w-8xl mx-auto px-6 sm:px-8 py-8">
+      <div className="flex flex-col lg:flex-row gap-12 lg:gap-16">
+        <div className="flex-1 lg:w-[72%]">
           <BentoGrid>
             {articles.map((article, i) => {
               const variant = i === 0 ? 'feature' : i <= 2 ? 'normal' : 'compact';
@@ -117,7 +213,7 @@ export default function HomePage() {
           </div>
         </div>
 
-        <aside className="lg:w-[35%] space-y-4">
+        <aside className="lg:w-[28%] flex-shrink-0 space-y-4">
           <GlassCard className="p-6 text-center">
             {author?.avatar_url ? (
               <img src={author.avatar_url} alt="" className="w-16 h-16 rounded-2xl object-cover mx-auto mb-3" />
@@ -144,6 +240,7 @@ export default function HomePage() {
           </GlassCard>
 
           <TagCloud tags={tags} />
+          <CalendarCard />
         </aside>
       </div>
 

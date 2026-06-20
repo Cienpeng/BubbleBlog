@@ -4,3 +4,6 @@ dist/
 .superpowers/
 uploads/
 *.log
+*.md
+!README.md
+!README*.md
