@@ -69,6 +69,8 @@ CREATE INDEX IF NOT EXISTS idx_articles_published_at ON articles(published_at DE
 CREATE INDEX IF NOT EXISTS idx_articles_slug ON articles(slug);
 CREATE INDEX IF NOT EXISTS idx_likes_article ON likes(article_id);
 CREATE INDEX IF NOT EXISTS idx_tags_slug ON tags(slug);
+CREATE INDEX IF NOT EXISTS idx_article_tags_tag_id ON article_tags(tag_id);
+CREATE INDEX IF NOT EXISTS idx_articles_status_published ON articles(status, published_at DESC);
 
 -- Full-text search: trigger for auto-updating search_vector
 CREATE OR REPLACE FUNCTION update_search_vector() RETURNS TRIGGER AS $$
@@ -123,6 +125,54 @@ FROM (VALUES
   ('__DEFAULT_GRADIENT_5__', 4)
 ) AS v(url, sort_order)
 WHERE NOT EXISTS (SELECT 1 FROM carousel_images WHERE is_default = true);
+
+-- Create security sessions table
+CREATE TABLE IF NOT EXISTS security_sessions (
+  id VARCHAR(64) PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  device VARCHAR(255) NOT NULL,
+  browser VARCHAR(255) NOT NULL,
+  ip VARCHAR(100) NOT NULL,
+  location VARCHAR(255) NOT NULL,
+  last_active_at TIMESTAMP DEFAULT NOW(),
+  token TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_security_sessions_user ON security_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_security_sessions_token ON security_sessions(token);
+
+-- Create security logs table
+CREATE TABLE IF NOT EXISTS security_logs (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  event VARCHAR(500) NOT NULL,
+  status VARCHAR(20) NOT NULL DEFAULT 'success',
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_security_logs_user ON security_logs(user_id);
+
+-- Page views for daily visit tracking
+CREATE TABLE IF NOT EXISTS page_views (
+  id SERIAL PRIMARY KEY,
+  article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
+  fingerprint VARCHAR(64) NOT NULL,
+  visited_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_page_views_date ON page_views(visited_at);
+CREATE INDEX IF NOT EXISTS idx_page_views_article ON page_views(article_id);
+
+-- Reading sessions for actual reading time tracking
+CREATE TABLE IF NOT EXISTS reading_sessions (
+  id SERIAL PRIMARY KEY,
+  article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
+  fingerprint VARCHAR(64) NOT NULL,
+  duration_seconds REAL NOT NULL DEFAULT 0,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_reading_sessions_article ON reading_sessions(article_id);
 `;
 
 async function migrate() {

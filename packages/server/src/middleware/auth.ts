@@ -1,6 +1,7 @@
 import { verifyToken, createToken } from '../services/jwt';
 import { getUserByUsername, updateLastActive } from '../db/queries/users';
 import { corsHeaders } from './cors';
+import sql from '../db/connection';
 
 const SLIDING_WINDOW_MS = 60 * 60 * 60 * 1000; // 60 hours
 
@@ -54,9 +55,38 @@ export async function requireAuth(req: Request): Promise<{ authorized: boolean; 
     };
   }
 
+  // If single session is enabled, check if current token is in security_sessions
+  const { getSetting } = require('../db/queries/settings');
+  const singleSessionVal = await getSetting('single_session_enabled');
+  if (singleSessionVal === 'true') {
+    const rows = await sql`
+      SELECT id FROM security_sessions WHERE token = ${token} AND user_id = ${user.id}
+    `;
+    if (rows.length === 0) {
+      return {
+        authorized: false,
+        response: Response.json(
+          { success: false, error: '您的账号已在其他终端登录，当前会话已失效' },
+          { status: 401, headers: corsHeaders() }
+        ),
+      };
+    }
+  }
+
   // Issue new token with fresh 60h window
   const newToken = await createToken({ username: user.username, userId: user.id });
   await updateLastActive(user.id);
+
+  // Sync token in security_sessions table
+  try {
+    await sql`
+      UPDATE security_sessions
+      SET token = ${newToken}, last_active_at = NOW()
+      WHERE token = ${token} AND user_id = ${user.id}
+    `;
+  } catch (e) {
+    console.error('Failed to sync token in security_sessions:', e);
+  }
 
   return { authorized: true, newToken };
 }

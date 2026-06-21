@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { IconStats, IconBook } from '@/components/Icons';
 import { adminApi } from '@/lib/api';
@@ -26,6 +26,20 @@ export default function Stats() {
   const [articlesReading, setArticlesReading] = useState<ArticleReading[]>([]);
   const [loading, setLoading] = useState(true);
   const [days, setDays] = useState(30);
+
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // Close dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -81,16 +95,42 @@ export default function Stats() {
             <h2 className="text-base font-bold text-text-primary dark:text-white"><IconStats size={18} className="text-gray-400 mr-2 inline" />访问量趋势</h2>
             <p className="text-xs text-gray-400 mt-0.5">每日页面访问量统计</p>
           </div>
-          <select
-            value={days}
-            onChange={e => setDays(Number(e.target.value))}
-            className="text-xs px-3 py-1.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.06] outline-none text-text-primary dark:text-white/80 cursor-pointer"
-          >
-            <option value={7}>最近 7 天</option>
-            <option value={14}>最近 14 天</option>
-            <option value={30}>最近 30 天</option>
-            <option value={60}>最近 60 天</option>
-          </select>
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+              className="flex items-center justify-between text-xs pl-3.5 pr-8 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 outline-none text-text-primary dark:text-white/80 cursor-pointer font-medium hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors min-w-[96px]"
+            >
+              <span>{days === 7 ? '最近 7 天' : days === 14 ? '最近 14 天' : days === 30 ? '最近 30 天' : '最近 60 天'}</span>
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500">
+                <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                </svg>
+              </span>
+            </button>
+
+            {dropdownOpen && (
+              <div className="absolute right-0 mt-1.5 w-full min-w-[100px] bg-white dark:bg-zinc-950 border border-black/10 dark:border-white/10 rounded-xl py-1 shadow-lg z-20 animate-fade-in">
+                {[7, 14, 30, 60].map(val => (
+                  <button
+                    key={val}
+                    type="button"
+                    onClick={() => {
+                      setDays(val);
+                      setDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors block ${
+                      days === val
+                        ? 'bg-brand/10 text-brand font-bold dark:bg-brand/20 dark:text-brand-light'
+                        : 'text-text-primary dark:text-white/80 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                    }`}
+                  >
+                    最近 {val} 天
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {loading ? (

@@ -19,6 +19,7 @@ import ArticleEditor from './pages/admin/ArticleEditor';
 import Appearance from './pages/admin/Appearance';
 import Stats from './pages/admin/Stats';
 import Profile from './pages/admin/Profile';
+import Security from './pages/admin/Security';
 
 function PublicLayout() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -65,6 +66,7 @@ export default function App() {
               <Route path="articles/:id/edit" element={<ArticleEditor />} />
               <Route path="stats" element={<Stats />} />
               <Route path="profile" element={<Profile />} />
+              <Route path="security" element={<Security />} />
               <Route path="appearance" element={<Appearance />} />
             </Route>
 

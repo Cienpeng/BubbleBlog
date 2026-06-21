@@ -26,7 +26,7 @@ interface Article {
 
 export default function ArticleEditor() {
   const { id } = useParams<{ id: string }>();
-  const isNew = id === 'new';
+  const isNew = !id || id === 'new';
   const navigate = useNavigate();
   const { updateToken } = useAuth();
 
@@ -41,6 +41,15 @@ export default function ArticleEditor() {
   const [error, setError] = useState('');
   const previewTimer = useRef<ReturnType<typeof setTimeout>>();
 
+  // Editor Preferences
+  const autoSaveEnabled = localStorage.getItem('editor_autosave_enabled') !== 'false';
+  const focusMode = localStorage.getItem('editor_focus_mode') === 'true';
+  const fontSize = localStorage.getItem('editor_font_size') || '16px';
+  const editorTheme = localStorage.getItem('editor_theme') || 'classic';
+
+  const lastSavedMarkdown = useRef('');
+  const lastSavedTitle = useRef('');
+
   // Fetch existing article
   useEffect(() => {
     if (isNew) return;
@@ -52,6 +61,8 @@ export default function ArticleEditor() {
         setTitle(data.title || '');
         setMarkdown(data.content_md || '');
         setTags(data.tags?.map(t => t.name) || []);
+        lastSavedMarkdown.current = data.content_md || '';
+        lastSavedTitle.current = data.title || '';
       } catch (err) {
         setError('加载文章失败');
       }
@@ -89,6 +100,8 @@ export default function ArticleEditor() {
         if (newToken) updateToken(newToken);
         setArticle(data);
         setSavedAt(new Date());
+        lastSavedMarkdown.current = markdown;
+        lastSavedTitle.current = data.title || '';
         // Replace URL with the new article ID
         navigate(`/admin/articles/${data.id}/edit`, { replace: true });
       } else {
@@ -101,6 +114,8 @@ export default function ArticleEditor() {
         if (newToken) updateToken(newToken);
         setArticle(data);
         setSavedAt(new Date());
+        lastSavedMarkdown.current = markdown;
+        lastSavedTitle.current = title;
       }
     } catch (err: any) {
       setError(err.message || '保存失败');
@@ -108,6 +123,19 @@ export default function ArticleEditor() {
       setSaving(false);
     }
   }, [isNew, id, title, markdown, tags, navigate, updateToken]);
+
+  // Auto-save logic (runs every 30 seconds if autoSaveEnabled is true)
+  useEffect(() => {
+    if (!autoSaveEnabled) return;
+    const interval = setInterval(() => {
+      // Only auto-save if something has actually changed and there is a title
+      const hasChanged = markdown !== lastSavedMarkdown.current || title !== lastSavedTitle.current;
+      if (title.trim() && hasChanged) {
+        save();
+      }
+    }, 30000);
+    return () => clearInterval(interval);
+  }, [markdown, title, autoSaveEnabled, save]);
 
   const toggleStatus = useCallback(async () => {
     if (!article) return;
@@ -150,6 +178,13 @@ export default function ArticleEditor() {
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
   }, [save]);
+
+  let themeClasses = 'bg-white/60 dark:bg-white/[0.03] text-text-primary dark:text-white/90 border-black/5 dark:border-white/[0.06] focus:border-brand/30';
+  if (editorTheme === 'github') {
+    themeClasses = 'bg-[#ffffff] dark:bg-[#0d1117] text-[#24292f] dark:text-[#c9d1d9] border-[#d0d7de] dark:border-[#30363d] focus:border-[#0969da] dark:focus:border-[#58a6ff] shadow-sm';
+  } else if (editorTheme === 'one-dark') {
+    themeClasses = 'bg-[#282c34] text-[#abb2bf] border-[#181a1f] focus:border-[#abb2bf]/30';
+  }
 
   return (
     <div className="animate-fade-in h-[calc(100vh-8rem)] flex flex-col">
@@ -200,25 +235,28 @@ export default function ArticleEditor() {
           <textarea
             value={markdown}
             onChange={e => setMarkdown(e.target.value)}
+            style={{ fontSize: fontSize }}
             placeholder={`# 开始写作...\n\n支持 Markdown 语法\n\n\`\`\`ts\nconst hello = 'world';\n\`\`\`\n\n> 引用文字\n\n- 列表项`}
-            className="flex-1 w-full resize-none rounded-2xl p-5 font-mono text-sm leading-relaxed bg-white/60 dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.06] outline-none focus:border-brand/30 transition-colors text-text-primary dark:text-white/90 placeholder-gray-300 dark:placeholder-gray-600"
+            className={`flex-1 w-full resize-none rounded-2xl p-5 font-mono text-sm leading-relaxed border outline-none transition-colors placeholder-gray-300 dark:placeholder-gray-600 ${themeClasses}`}
           />
         </div>
 
         {/* Live preview */}
-        <div className="flex-1 flex flex-col min-w-0">
-          <div className="mb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">预览</div>
-          <div className="flex-1 rounded-2xl p-5 overflow-y-auto bg-white/40 dark:bg-white/[0.02] border border-black/5 dark:border-white/[0.06]">
-            {previewHtml ? (
-              <article
-                className="prose prose-sm dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ __html: previewHtml }}
-              />
-            ) : (
-              <p className="text-gray-300 dark:text-gray-600 text-sm italic">预览将实时显示在这里...</p>
-            )}
+        {!focusMode && (
+          <div className="flex-1 flex flex-col min-w-0">
+            <div className="mb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">预览</div>
+            <div className="flex-1 rounded-2xl p-5 overflow-y-auto bg-white/40 dark:bg-white/[0.02] border border-black/5 dark:border-white/[0.06]">
+              {previewHtml ? (
+                <article
+                  className="prose prose-sm dark:prose-invert max-w-none"
+                  dangerouslySetInnerHTML={{ __html: previewHtml }}
+                />
+              ) : (
+                <p className="text-gray-300 dark:text-gray-600 text-sm italic">预览将实时显示在这里...</p>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Tags */}

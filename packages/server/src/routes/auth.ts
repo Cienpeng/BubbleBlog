@@ -2,12 +2,25 @@ import { corsHeaders, handleCors } from '../middleware/cors';
 import { loginRateLimit } from '../middleware/ratelimit';
 import { createToken } from '../services/jwt';
 import { getUserByUsername, updateLastActive, createUser } from '../db/queries/users';
+import { securityService } from '../services/security';
 
 async function hashPassword(password: string): Promise<string> {
   return Bun.password.hash(password, { algorithm: 'bcrypt', cost: 12 });
 }
 
-export async function handleAuth(req: Request): Promise<Response> {
+function getClientIp(req: Request, server: any): string {
+  const forwarded = req.headers.get('x-forwarded-for');
+  if (forwarded) return forwarded.split(',')[0].trim();
+  const realIp = req.headers.get('x-real-ip');
+  if (realIp) return realIp;
+  try {
+    const ip = server?.requestIP?.(req);
+    if (ip?.address) return ip.address;
+  } catch (e) {}
+  return '127.0.0.1';
+}
+
+export async function handleAuth(req: Request, server?: any): Promise<Response> {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
 
@@ -48,6 +61,24 @@ export async function handleAuth(req: Request): Promise<Response> {
 
     const token = await createToken({ username: user.username, userId: user.id });
     await updateLastActive(user.id);
+
+    // Record session and audit log
+    const ua = req.headers.get('user-agent') || 'Unknown User-Agent';
+    const ip = getClientIp(req, server);
+
+    // If single session is enabled, logout others immediately
+    const { getSetting } = require('../db/queries/settings');
+    try {
+      const singleSessionVal = await getSetting('single_session_enabled');
+      if (singleSessionVal === 'true') {
+        await securityService.logoutOthers(user.id, token);
+      }
+    } catch (e) {
+      console.error('Failed to query single session setting on login:', e);
+    }
+
+    await securityService.addSession(user.id, token, ua, ip);
+    await securityService.recordActivity(user.id, '管理员密码验证登录', 'success');
 
     return Response.json(
       {

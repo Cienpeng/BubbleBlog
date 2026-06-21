@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { IconBubble, IconSearch, IconPlus, IconArticles, IconStats, IconAppearance, IconHome, IconUser } from '@/components/Icons';
+import { IconBubble, IconSearch, IconPlus, IconArticles, IconStats, IconAppearance, IconHome, IconUser, IconShield } from '@/components/Icons';
 
 interface Command {
   id: string;
@@ -22,6 +22,7 @@ export default function CommandPalette() {
     { id: 'dashboard', label: '文章管理', shortcut: 'D', Icon: IconArticles, action: () => navigate('/admin') },
     { id: 'stats', label: '数据统计', shortcut: 'S', Icon: IconStats, action: () => navigate('/admin/stats') },
     { id: 'appearance', label: '外观设置', shortcut: 'A', Icon: IconAppearance, action: () => navigate('/admin/appearance') },
+    { id: 'security', label: '安全中心', shortcut: 'G', Icon: IconShield, action: () => navigate('/admin/security') },
     { id: 'profile', label: '个人资料', shortcut: 'P', Icon: IconUser, action: () => navigate('/admin/profile') },
     { id: 'home', label: '返回前台', shortcut: 'H', Icon: IconHome, action: () => navigate('/') },
   ];

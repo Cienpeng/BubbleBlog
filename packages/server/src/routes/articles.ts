@@ -14,8 +14,20 @@ import {
 } from '../db/queries/articles';
 import { getOrCreateTags, setArticleTags } from '../db/queries/tags';
 import { renderMarkdown } from '../markdown/renderer';
+import { verifyToken } from '../services/jwt';
+import { securityService } from '../services/security';
 
 const ALLOWED_MD_EXTENSIONS = ['.md', '.markdown', '.txt'];
+
+async function getUserId(req: Request): Promise<{ userId: number; username: string } | null> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  try {
+    return verifyToken(authHeader.slice(7));
+  } catch (e) {
+    return null;
+  }
+}
 
 export async function handleArticles(req: Request): Promise<Response> {
   const corsResponse = handleCors(req);
@@ -142,6 +154,11 @@ export async function handleArticles(req: Request): Promise<Response> {
 
     const created = await getArticleById(article.id);
 
+    const userPayload = await getUserId(req);
+    if (userPayload) {
+      securityService.recordActivity(userPayload.userId, `新建并上传文章《${created?.title || '未命名'}》`, 'success');
+    }
+
     return Response.json(
       { success: true, data: created, newToken: auth.newToken },
       { status: 201, headers: corsHeaders() }
@@ -177,6 +194,11 @@ export async function handleArticles(req: Request): Promise<Response> {
         { status: 404, headers: corsHeaders() }
       );
     }
+    const userPayload = await getUserId(req);
+    if (userPayload) {
+      securityService.recordActivity(userPayload.userId, `公开发布文章《${article.title}》`, 'success');
+    }
+
     return Response.json(
       { success: true, data: article, newToken: auth.newToken },
       { headers: corsHeaders() }
@@ -196,6 +218,11 @@ export async function handleArticles(req: Request): Promise<Response> {
         { status: 404, headers: corsHeaders() }
       );
     }
+    const userPayload = await getUserId(req);
+    if (userPayload) {
+      securityService.recordActivity(userPayload.userId, `撤回/下线文章《${article.title}》`, 'success');
+    }
+
     return Response.json(
       { success: true, data: article, newToken: auth.newToken },
       { headers: corsHeaders() }
@@ -249,6 +276,11 @@ export async function handleArticles(req: Request): Promise<Response> {
 
     const updated = await getArticleById(id);
 
+    const userPayload = await getUserId(req);
+    if (userPayload) {
+      securityService.recordActivity(userPayload.userId, `更新编辑文章《${updated?.title || '未命名'}》`, 'success');
+    }
+
     return Response.json(
       { success: true, data: updated, newToken: auth.newToken },
       { headers: corsHeaders() }
@@ -264,6 +296,11 @@ export async function handleArticles(req: Request): Promise<Response> {
     if (!deleted) {
       return Response.json({ success: false, error: 'Not found' }, { status: 404, headers: corsHeaders() });
     }
+    const userPayload = await getUserId(req);
+    if (userPayload) {
+      securityService.recordActivity(userPayload.userId, `彻底删除文章 (ID: ${updateMatch[1]})`, 'success');
+    }
+
     return Response.json(
       { success: true, data: { deleted: true }, newToken: auth.newToken },
       { headers: corsHeaders() }

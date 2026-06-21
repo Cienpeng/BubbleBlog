@@ -9,6 +9,7 @@ const TABS = [
   { path: '/admin', label: '文章管理', exact: true },
   { path: '/admin/stats', label: '数据统计', exact: false },
   { path: '/admin/appearance', label: '外观设置', exact: false },
+  { path: '/admin/security', label: '安全中心', exact: false },
   { path: '/admin/profile', label: '个人资料', exact: false },
 ];
 

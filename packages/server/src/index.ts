@@ -40,7 +40,7 @@ function addSecurityHeaders(response: Response): Response {
 
 Bun.serve({
   port: PORT,
-  async fetch(req) {
+  async fetch(req, server) {
     const url = new URL(req.url);
 
     // Health check (no rate limit)
@@ -59,7 +59,7 @@ Bun.serve({
     try {
       // Route matching
       if (url.pathname.startsWith('/api/auth/')) {
-        return addSecurityHeaders(await handleAuth(req));
+        return addSecurityHeaders(await handleAuth(req, server));
       }
       if (url.pathname.startsWith('/api/settings')) {
         return addSecurityHeaders(await handleSettings(req));
@@ -88,8 +88,13 @@ Bun.serve({
       if (url.pathname.startsWith('/api/admin/stats')) {
         return addSecurityHeaders(await handleStatsAPI(req));
       }
-      if (url.pathname.startsWith('/api/admin/profile') || url.pathname === '/api/admin/password' || url.pathname === '/api/profile') {
-        return addSecurityHeaders(await handleProfile(req));
+      if (
+        url.pathname.startsWith('/api/admin/profile') ||
+        url.pathname === '/api/admin/password' ||
+        url.pathname === '/api/profile' ||
+        url.pathname.startsWith('/api/admin/security')
+      ) {
+        return addSecurityHeaders(await handleProfile(req, server));
       }
       if (url.pathname.startsWith('/api/track')) {
         return addSecurityHeaders(await handleTracking(req));

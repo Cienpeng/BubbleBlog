@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
-    "db:migrate": "bun src/db/migrate.ts"
+    "db:migrate": "bun src/db/migrate.ts",
+    "db:migrate-security": "bun src/db/migrate-security.ts",
+    "db:migrate-stats": "bun src/db/migrate-stats.ts"
   },
   "dependencies": {
     "@bubbleblog/shared": "workspace:*",

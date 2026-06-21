@@ -113,11 +113,34 @@ function CalendarCard() {
   );
 }
 
+function parseBioAndSocials(rawBio: string | null) {
+  if (!rawBio) return { bioText: '', socials: { github: '', email: '', bilibili: '', twitter: '' } };
+  try {
+    const data = JSON.parse(rawBio);
+    if (data && typeof data === 'object' && ('bio' in data || 'github' in data || 'email' in data || 'bilibili' in data || 'twitter' in data)) {
+      return {
+        bioText: data.bio || '',
+        socials: {
+          github: data.github || '',
+          email: data.email || '',
+          bilibili: data.bilibili || '',
+          twitter: data.twitter || '',
+        }
+      };
+    }
+  } catch (e) {
+    // Not JSON
+  }
+  return { bioText: rawBio, socials: { github: '', email: '', bilibili: '', twitter: '' } };
+}
+
 export default function HomePage() {
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [author, setAuthor] = useState<AuthorInfo | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const { bioText, socials } = parseBioAndSocials(author?.bio || null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
@@ -214,7 +237,14 @@ export default function HomePage() {
         </div>
 
         <aside className="lg:w-[25%] flex-shrink-0 space-y-4">
-          <GlassCard className="p-6 text-center relative overflow-hidden">
+          <div className="relative">
+            <img 
+              src="/author-card-banner.png" 
+              alt="" 
+              className="absolute bottom-full right-0 w-1/2 h-auto object-contain z-20 pointer-events-none"
+              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+            />
+            <GlassCard className="p-6 text-center relative overflow-hidden">
             {author?.avatar_url ? (
               <div className="relative w-20 h-20 mx-auto mb-4 rounded-full ring-4 ring-brand/15 ring-offset-2 dark:ring-offset-black overflow-hidden shadow-sm">
                 <img src={author.avatar_url} alt="" className="w-full h-full object-cover" />
@@ -228,15 +258,76 @@ export default function HomePage() {
               {author?.display_name || '作者'}
             </h3>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5 px-2">
-              {author?.bio || '技术写作者'}
+              {bioText || '技术写作者'}
             </p>
             {author?.tags && author.tags.length > 0 && (
               <div className="flex flex-wrap gap-1 justify-center mt-3.5">
-                {author.tags.map(t => (
+                {author.tags.slice(0, 5).map(t => (
                   <span key={t.id} className="px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wide bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand-light">
                     {t.name}
                   </span>
                 ))}
+              </div>
+            )}
+
+            {/* Social Icons row */}
+            {(socials.github || socials.email || socials.bilibili || socials.twitter) && (
+              <div className="flex justify-center items-center gap-4 mt-4 text-gray-400 dark:text-gray-500">
+                {socials.github && (
+                  <a
+                    href={socials.github}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-brand dark:hover:text-brand-light transition-colors"
+                    title="GitHub"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                      <path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22" />
+                    </svg>
+                  </a>
+                )}
+                {socials.email && (
+                  <a
+                    href={`mailto:${socials.email}`}
+                    className="hover:text-brand dark:hover:text-brand-light transition-colors"
+                    title="Email"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                      <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
+                      <polyline points="22,6 12,13 2,6" />
+                    </svg>
+                  </a>
+                )}
+                {socials.bilibili && (
+                  <a
+                    href={socials.bilibili}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-brand dark:hover:text-brand-light transition-colors"
+                    title="Bilibili"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                      <rect x="2" y="6" width="20" height="14" rx="4" />
+                      <path d="M7 2l3 4M17 2l-3 4" />
+                      <circle cx="8" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                      <circle cx="16" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                      <path d="M9 16c1 1.5 5 1.5 6 0" />
+                    </svg>
+                  </a>
+                )}
+                {socials.twitter && (
+                  <a
+                    href={socials.twitter}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:text-brand dark:hover:text-brand-light transition-colors"
+                    title="Twitter / X"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                      <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />
+                    </svg>
+                  </a>
+                )}
               </div>
             )}
 
@@ -252,6 +343,7 @@ export default function HomePage() {
               </div>
             </div>
           </GlassCard>
+        </div>
 
           <TagCloud tags={tags} />
           <CalendarCard />
