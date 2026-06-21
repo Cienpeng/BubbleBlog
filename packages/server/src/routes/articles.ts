@@ -39,8 +39,10 @@ export async function handleArticles(req: Request): Promise<Response> {
   if (url.pathname === '/api/articles' && req.method === 'GET') {
     const page = parseInt(url.searchParams.get('page') || '1');
     const limit = parseInt(url.searchParams.get('limit') || '5');
+    const offsetStr = url.searchParams.get('offset');
+    const offset = offsetStr ? parseInt(offsetStr) : undefined;
     const tag = url.searchParams.get('tag') || undefined;
-    const result = await getPublishedArticles(page, limit, tag);
+    const result = await getPublishedArticles(page, limit, tag, offset);
     return Response.json({ success: true, data: result }, { headers: corsHeaders() });
   }
 
@@ -121,7 +123,7 @@ export async function handleArticles(req: Request): Promise<Response> {
     const rendered = renderMarkdown(markdown);
 
     const article = await createArticle({
-      title: rendered.title,
+      title: body.title || rendered.title,
       content_md: markdown,
       excerpt: rendered.excerpt,
       cover_image: rendered.coverImage,
@@ -133,24 +135,25 @@ export async function handleArticles(req: Request): Promise<Response> {
     if (rendered.tags.length > 0) {
       const tags = await getOrCreateTags(rendered.tags);
       await setArticleTags(article.id, tags.map(t => t.id));
-      console.log(`[tags] Set ${tags.length} frontmatter tags for article ${article.id}:`, rendered.tags);
+      // console.log(`[tags] Set ${tags.length} frontmatter tags for article ${article.id}:`, rendered.tags);
     }
 
     // Explicit tags (from editor UI, overrides frontmatter)
     if (Array.isArray(body.tags)) {
       const tagNames: string[] = body.tags.filter((t: any) => typeof t === 'string' && t.trim());
-      console.log(`[tags] Explicit tags for article ${article.id}:`, tagNames);
+      // console.log(`[tags] Explicit tags for article ${article.id}:`, tagNames);
       if (tagNames.length > 0) {
         const tags = await getOrCreateTags(tagNames);
         await setArticleTags(article.id, tags.map(t => t.id));
-        console.log(`[tags] Saved ${tags.length} explicit tags for article ${article.id}`);
+        // console.log(`[tags] Saved ${tags.length} explicit tags for article ${article.id}`);
       } else if (body.tags.length === 0) {
         await setArticleTags(article.id, []);
-        console.log(`[tags] Cleared all tags for article ${article.id}`);
+        // console.log(`[tags] Cleared all tags for article ${article.id}`);
       }
-    } else {
-      console.log(`[tags] body.tags is not an array:`, typeof body.tags, body.tags);
-    }
+    } 
+    // else {
+    //   console.log(`[tags] body.tags is not an array:`, typeof body.tags, body.tags);
+    // }
 
     const created = await getArticleById(article.id);
 
@@ -245,25 +248,26 @@ export async function handleArticles(req: Request): Promise<Response> {
       if (rendered.tags && rendered.tags.length > 0) {
         const tags = await getOrCreateTags(rendered.tags);
         await setArticleTags(id, tags.map(t => t.id));
-        console.log(`[tags] PUT frontmatter tags for ${id}:`, rendered.tags);
+        // console.log(`[tags] PUT frontmatter tags for ${id}:`, rendered.tags);
       }
     }
 
     // Explicit tags (from editor UI, overrides frontmatter)
     if (Array.isArray(body.tags)) {
       const tagNames: string[] = body.tags.filter((t: any) => typeof t === 'string' && t.trim());
-      console.log(`[tags] PUT explicit for ${id}:`, tagNames);
+      // console.log(`[tags] PUT explicit for ${id}:`, tagNames);
       if (tagNames.length > 0) {
         const tags = await getOrCreateTags(tagNames);
         await setArticleTags(id, tags.map(t => t.id));
-        console.log(`[tags] PUT saved ${tags.length} tags for ${id}`);
+        // console.log(`[tags] PUT saved ${tags.length} tags for ${id}`);
       } else if (body.tags.length === 0) {
         await setArticleTags(id, []);
-        console.log(`[tags] PUT cleared tags for ${id}`);
+        // console.log(`[tags] PUT cleared tags for ${id}`);
       }
-    } else {
-      console.log(`[tags] PUT body.tags type:`, typeof body.tags, JSON.stringify(body.tags));
-    }
+    } 
+    // else {
+    //   console.log(`[tags] PUT body.tags type:`, typeof body.tags, JSON.stringify(body.tags));
+    // }
 
     const article = await updateArticle(id, body);
     if (!article) {

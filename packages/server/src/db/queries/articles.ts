@@ -4,9 +4,10 @@ import type { Article, ArticleListItem, ArticleWithTags, CreateArticleInput, Pag
 export async function getPublishedArticles(
   page: number = 1,
   limit: number = 5,
-  tag?: string
+  tag?: string,
+  explicitOffset?: number
 ): Promise<PaginatedResponse<ArticleListItem>> {
-  const offset = (page - 1) * limit;
+  const offset = explicitOffset !== undefined ? explicitOffset : (page - 1) * limit;
 
   let countQuery: Promise<[{count: number}]>;
   let itemsQuery: Promise<any[]>;

@@ -13,7 +13,7 @@ function getSql() {
       max: 5,
       idle_timeout: 30,
     });
-    console.log(`[db] Connecting to ${process.env.DB_HOST}:${process.env.DB_PORT} as ${process.env.DB_USER}`);
+    // console.log(`[db] Connecting to ${process.env.DB_HOST}:${process.env.DB_PORT} as ${process.env.DB_USER}`);
   }
   return _sql;
 }

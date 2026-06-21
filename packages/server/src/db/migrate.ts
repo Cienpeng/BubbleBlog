@@ -7,9 +7,17 @@ CREATE TABLE IF NOT EXISTS users (
   id SERIAL PRIMARY KEY,
   username VARCHAR(50) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
+  display_name VARCHAR(100),
+  bio TEXT DEFAULT '',
+  avatar_url VARCHAR(500) DEFAULT '',
   last_active_at TIMESTAMP DEFAULT NOW(),
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+-- Ensure display_name, bio, avatar_url columns exist (for backwards compatibility)
+ALTER TABLE users ADD COLUMN IF NOT EXISTS display_name VARCHAR(100);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT '';
+ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500) DEFAULT '';
 
 -- Articles table
 CREATE TABLE IF NOT EXISTS articles (
@@ -41,6 +49,13 @@ CREATE TABLE IF NOT EXISTS article_tags (
   article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
   tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
   PRIMARY KEY (article_id, tag_id)
+);
+
+-- User-tags junction
+CREATE TABLE IF NOT EXISTS user_tags (
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  tag_id INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (user_id, tag_id)
 );
 
 -- Likes table

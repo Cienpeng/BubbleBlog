@@ -30,7 +30,7 @@ export default function AdminLayout() {
           <div className="flex items-center gap-6">
             <button
               onClick={() => navigate('/admin')}
-              className="flex items-center gap-2 text-lg font-extrabold text-text-primary dark:text-white tracking-tight hover:opacity-70 transition-opacity"
+              className="flex items-center gap-2 text-[21px] font-black text-text-primary dark:text-white tracking-tight hover:opacity-70 transition-opacity"
             >
               <IconBubble size={22} className="text-brand" />
               BubbleBlog

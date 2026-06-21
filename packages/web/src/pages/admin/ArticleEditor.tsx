@@ -94,6 +94,7 @@ export default function ArticleEditor() {
       if (isNew) {
         // Create new article
         const { data, newToken } = await adminApi.post<Article>('/api/articles/upload', {
+          title,
           content_md: markdown,
           tags,
         });

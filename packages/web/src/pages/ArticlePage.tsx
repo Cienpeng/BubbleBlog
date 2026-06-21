@@ -265,6 +265,16 @@ export default function ArticlePage() {
       </article>
 
       <BackToTop />
+
+      {/* Decorative Corner Mascot Banner */}
+      <div className="fixed bottom-0 right-0 z-40 w-24 sm:w-28 md:w-32 h-auto pointer-events-none select-none animate-fade-in">
+        <img
+          src="/article-corner-banner.png"
+          alt=""
+          className="w-full h-auto object-contain"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        />
+      </div>
     </div>
   );
 }

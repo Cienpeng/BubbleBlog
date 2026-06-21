@@ -30,10 +30,10 @@ export default function Navbar({ onSearchClick }: NavbarProps) {
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         {/* Brand Logo */}
         <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-8 h-8 rounded-xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center border border-brand/20 transition-all duration-300 group-hover:scale-105">
-            <IconBubble className="text-brand" size={16} />
+          <div className="w-9 h-9 rounded-xl bg-brand/10 dark:bg-brand/20 flex items-center justify-center border border-brand/20 transition-all duration-300 group-hover:scale-105">
+            <IconBubble className="text-brand" size={18} />
           </div>
-          <span className="font-black text-[17px] tracking-tight text-text-primary dark:text-white">
+          <span className="font-black text-[21px] tracking-tight text-text-primary dark:text-white">
             Bubble<span className="text-brand dark:text-brand-light">Blog</span>
           </span>
         </Link>

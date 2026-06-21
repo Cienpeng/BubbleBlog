@@ -34,7 +34,7 @@ export default function LoginPage() {
     <div className="flex flex-col items-center justify-center min-h-[70vh] px-4">
       <div className="w-full max-w-sm glass rounded-3xl p-8 text-center animate-fade-in">
         <IconBubble size={48} className="text-brand mx-auto mb-4" />
-        <h1 className="text-xl font-extrabold text-text-primary dark:text-white mb-6">BubbleBlog</h1>
+        <h1 className="text-[21px] font-black text-text-primary dark:text-white mb-6">BubbleBlog</h1>
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>

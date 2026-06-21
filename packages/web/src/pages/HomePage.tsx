@@ -143,19 +143,85 @@ export default function HomePage() {
   const { bioText, socials } = parseBioAndSocials(author?.bio || null);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [totalCount, setTotalCount] = useState(0);
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const initialArticles = useRef<ArticleListItem[]>([]);
+  const placeholderRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [placeholderHeight, setPlaceholderHeight] = useState(120);
+  const [imgStyle, setImgStyle] = useState<{
+    left: number;
+    width: number;
+    top: number;
+    visible: boolean;
+  }>({ left: 0, width: 0, top: 0, visible: false });
+
+  const updatePosition = () => {
+    const placeholder = placeholderRef.current;
+    const bannerEl = document.querySelector('.author-banner-container');
+    if (!placeholder || !bannerEl) return;
+
+    const bannerRect = bannerEl.getBoundingClientRect();
+    const isBannerGone = bannerRect.top <= -30;
+
+    if (!isBannerGone) {
+      setImgStyle(prev => (prev.visible ? { ...prev, visible: false } : prev));
+      return;
+    }
+
+    const placeholderRect = placeholder.getBoundingClientRect();
+    const V_h = window.innerHeight;
+    const h_img = imgRef.current ? imgRef.current.offsetHeight : 120;
+    
+    const width = placeholderRect.width / 2;
+    const left = placeholderRect.left + placeholderRect.width / 4;
+    const top = Math.max(placeholderRect.top, V_h - 10 - h_img);
+
+    setImgStyle({
+      left,
+      width,
+      top,
+      visible: true,
+    });
+  };
+
+  const handleImageLoad = () => {
+    if (imgRef.current) {
+      setPlaceholderHeight(imgRef.current.offsetHeight || 120);
+    }
+    updatePosition();
+  };
+
+  useEffect(() => {
+    const handleScrollOrResize = () => {
+      updatePosition();
+    };
+
+    window.addEventListener('scroll', handleScrollOrResize, { passive: true });
+    window.addEventListener('resize', handleScrollOrResize);
+    
+    const timer = setTimeout(() => {
+      updatePosition();
+    }, 100);
+
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize);
+      window.removeEventListener('resize', handleScrollOrResize);
+      clearTimeout(timer);
+    };
+  }, [articles, author]);
 
   useEffect(() => {
     Promise.all([
-      api.get<{ items: ArticleListItem[]; total_pages: number }>('/api/articles?limit=5'),
+      api.get<{ items: ArticleListItem[]; total: number }>('/api/articles?limit=5'),
       api.get<Tag[]>('/api/tags'),
       fetch('/api/profile').then(r => r.json()).then(d => d.data || null).catch(() => null),
     ])
       .then(([articleData, tagData, authorData]) => {
         setArticles(articleData.items);
         initialArticles.current = articleData.items;
-        setHasMore(articleData.total_pages > 1);
+        setTotalCount(articleData.total || 0);
+        setHasMore(articleData.items.length < (articleData.total || 0) && articleData.items.length < 20);
         setTags(tagData);
         if (authorData) setAuthor(authorData);
       })
@@ -165,16 +231,18 @@ export default function HomePage() {
 
   const loadMore = async () => {
     const nextPage = page + 1;
-    const data = await api.get<{ items: ArticleListItem[]; total_pages: number }>(`/api/articles?page=${nextPage}&limit=5`);
-    setArticles(prev => [...prev, ...data.items]);
+    const currentCount = articles.length;
+    const data = await api.get<{ items: ArticleListItem[]; total: number }>(`/api/articles?offset=${currentCount}&limit=12`);
+    const newArticles = [...articles, ...data.items];
+    setArticles(newArticles);
     setPage(nextPage);
-    setHasMore(data.total_pages > nextPage);
+    setHasMore(newArticles.length < (data.total || 0) && newArticles.length < 17);
   };
 
   const collapse = () => {
     setArticles(initialArticles.current);
     setPage(1);
-    setHasMore(true);
+    setHasMore(initialArticles.current.length < totalCount && initialArticles.current.length < 17);
   };
 
   const isExpanded = articles.length > initialArticles.current.length;
@@ -211,7 +279,7 @@ export default function HomePage() {
           </BentoGrid>
 
           <div className="text-center mt-8 flex items-center justify-center gap-4">
-            {hasMore && !isExpanded && (
+            {hasMore && articles.length < 20 && (
               <button
                 onClick={loadMore}
                 className="px-6 py-2 rounded-[24px] glass text-sm text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-all duration-200 hover:scale-105"
@@ -237,7 +305,7 @@ export default function HomePage() {
         </div>
 
         <aside className="lg:w-[25%] flex-shrink-0 space-y-4">
-          <div className="relative">
+          <div className="relative author-banner-container">
             <img 
               src="/author-card-banner.png" 
               alt="" 
@@ -347,9 +415,28 @@ export default function HomePage() {
 
           <TagCloud tags={tags} />
           <CalendarCard />
+
+          <div ref={placeholderRef} className="w-full relative pointer-events-none opacity-0" style={{ height: `${placeholderHeight}px` }} />
         </aside>
       </div>
 
+      <img
+        ref={imgRef}
+        src="/author-card-banner-sticky.png"
+        alt=""
+        onLoad={handleImageLoad}
+        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+        style={{
+          position: 'fixed',
+          left: `${imgStyle.left}px`,
+          width: `${imgStyle.width}px`,
+          top: `${imgStyle.top}px`,
+          opacity: imgStyle.visible ? 1 : 0,
+          pointerEvents: 'none',
+          zIndex: 30,
+          transition: 'opacity 0.2s ease-in-out',
+        }}
+      />
     </div>
   );
 }
