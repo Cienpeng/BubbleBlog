@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { IconUpload, IconPlus, IconArticles } from '@/components/Icons';
+import { IconUpload, IconPlus, IconArticles, IconHeart } from '@/components/Icons';
 import { adminApi } from '@/lib/api';
 
 interface Article {
@@ -10,6 +10,7 @@ interface Article {
   slug: string;
   status: 'draft' | 'published';
   reading_time: number;
+  likes_count?: number;
   published_at: string | null;
   created_at: string;
   updated_at: string;
@@ -37,10 +38,11 @@ export default function Dashboard() {
 
       const all = data || [];
       setArticles(all);
+      const totalLikes = all.reduce((sum, a) => sum + (a.likes_count || 0), 0);
       setStats({
         drafts: all.filter(a => a.status === 'draft').length,
         published: all.filter(a => a.status === 'published').length,
-        totalLikes: 0, // We'll add a likes count endpoint later
+        totalLikes,
       });
     } catch (err) {
       console.error('Failed to fetch articles:', err);
@@ -207,9 +209,15 @@ export default function Dashboard() {
               </Link>
 
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-black/[0.04] dark:border-white/[0.04]">
-                <span className="text-[11px] text-gray-400">
-                  {formatDate(article.published_at || article.updated_at)}
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-[11px] text-gray-400">
+                    {formatDate(article.published_at || article.updated_at)}
+                  </span>
+                  <div className="flex items-center gap-1 text-[11px] text-gray-400">
+                    <IconHeart size={12} className="text-rose-500/80" />
+                    <span>{article.likes_count || 0}</span>
+                  </div>
+                </div>
                 <div className="flex items-center gap-2">
                   {article.tags?.slice(0, 2).map(t => (
                     <span key={t.id} className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/[0.03] dark:bg-white/[0.04] text-gray-400">

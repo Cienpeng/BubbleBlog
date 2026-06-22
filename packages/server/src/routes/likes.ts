@@ -8,9 +8,10 @@ export async function handleLikes(req: Request): Promise<Response> {
 
   const url = new URL(req.url);
 
-  const likesMatch = url.pathname.match(/^\/api\/articles\/([a-zA-Z0-9一-鿿\-]+)\/likes$/);
+  const likesMatch = url.pathname.match(/^\/api\/articles\/([^\/]+)\/likes$/);
   if (likesMatch && req.method === 'GET') {
-    const articleId = await getArticleIdBySlug(likesMatch[1]);
+    const slug = decodeURIComponent(likesMatch[1]);
+    const articleId = await getArticleIdBySlug(slug);
     if (!articleId) {
       return Response.json({ success: false, error: 'Article not found' }, { status: 404, headers: corsHeaders() });
     }
@@ -29,7 +30,8 @@ export async function handleLikes(req: Request): Promise<Response> {
     const rateLimitResponse = likeRateLimit(fingerprint);
     if (rateLimitResponse) return rateLimitResponse;
 
-    const articleId = await getArticleIdBySlug(likesMatch[1]);
+    const slug = decodeURIComponent(likesMatch[1]);
+    const articleId = await getArticleIdBySlug(slug);
     if (!articleId) {
       return Response.json({ success: false, error: 'Article not found' }, { status: 404, headers: corsHeaders() });
     }

@@ -13,9 +13,10 @@ export async function handleCarouselAPI(req: Request): Promise<Response> {
   const url = new URL(req.url);
 
   // GET /api/articles/:slug/carousel — public
-  const match = url.pathname.match(/^\/api\/articles\/([a-zA-Z0-9一-鿿\-]+)\/carousel$/);
+  const match = url.pathname.match(/^\/api\/articles\/([^\/]+)\/carousel$/);
   if (match && req.method === 'GET') {
-    const images = await getCarouselForArticle(match[1]);
+    const slug = decodeURIComponent(match[1]);
+    const images = await getCarouselForArticle(slug);
 
     const result = images.map(img => ({
       id: img.id,

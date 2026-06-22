@@ -73,7 +73,11 @@ export async function getPublishedArticles(
 
 export async function getArticleBySlug(slug: string): Promise<ArticleWithTags | null> {
   const rows = await sql`
-    SELECT a.* FROM articles a WHERE a.slug = ${slug}`;
+    SELECT a.*, COUNT(l.id)::int as likes_count
+    FROM articles a
+    LEFT JOIN likes l ON a.id = l.article_id
+    WHERE a.slug = ${slug}
+    GROUP BY a.id`;
   if (rows.length === 0) return null;
 
   const article = rows[0];
@@ -103,6 +107,7 @@ export async function getArticleBySlug(slug: string): Promise<ArticleWithTags | 
     cover_image: article.cover_image,
     status: article.status,
     reading_time: article.reading_time,
+    likes_count: article.likes_count,
     published_at: article.published_at,
     created_at: article.created_at,
     updated_at: article.updated_at,
@@ -198,7 +203,32 @@ export async function getArticleById(id: number): Promise<ArticleWithTags | null
 }
 
 export async function getAllArticles(): Promise<Article[]> {
-  return await sql`SELECT * FROM articles ORDER BY updated_at DESC`;
+  const articles = await sql`
+    SELECT a.*, COUNT(l.id)::int as likes_count
+    FROM articles a
+    LEFT JOIN likes l ON a.id = l.article_id
+    GROUP BY a.id
+    ORDER BY a.updated_at DESC
+  `;
+
+  const articleIds = articles.map((a: any) => a.id);
+  let tagMap: Record<number, any[]> = {};
+  if (articleIds.length > 0) {
+    const tagRows = await sql`
+      SELECT at2.article_id, t.id, t.name, t.slug
+      FROM article_tags at2
+      JOIN tags t ON t.id = at2.tag_id
+      WHERE at2.article_id = ANY(${articleIds})`;
+    for (const row of tagRows) {
+      if (!tagMap[row.article_id]) tagMap[row.article_id] = [];
+      tagMap[row.article_id].push({ id: row.id, name: row.name, slug: row.slug });
+    }
+  }
+
+  return articles.map((a: any) => ({
+    ...a,
+    tags: tagMap[a.id] || [],
+  })) as unknown as Article[];
 }
 
 function generateSlug(title: string): string {

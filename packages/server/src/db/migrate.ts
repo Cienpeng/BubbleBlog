@@ -62,7 +62,7 @@ CREATE TABLE IF NOT EXISTS user_tags (
 CREATE TABLE IF NOT EXISTS likes (
   id SERIAL PRIMARY KEY,
   article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
-  fingerprint VARCHAR(64) NOT NULL,
+  fingerprint VARCHAR(512) NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   UNIQUE (article_id, fingerprint)
 );
@@ -171,7 +171,7 @@ CREATE INDEX IF NOT EXISTS idx_security_logs_user ON security_logs(user_id);
 CREATE TABLE IF NOT EXISTS page_views (
   id SERIAL PRIMARY KEY,
   article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
-  fingerprint VARCHAR(64) NOT NULL,
+  fingerprint VARCHAR(512) NOT NULL,
   visited_at TIMESTAMP DEFAULT NOW()
 );
 
@@ -182,12 +182,33 @@ CREATE INDEX IF NOT EXISTS idx_page_views_article ON page_views(article_id);
 CREATE TABLE IF NOT EXISTS reading_sessions (
   id SERIAL PRIMARY KEY,
   article_id INTEGER REFERENCES articles(id) ON DELETE CASCADE,
-  fingerprint VARCHAR(64) NOT NULL,
+  fingerprint VARCHAR(512) NOT NULL,
   duration_seconds REAL NOT NULL DEFAULT 0,
   created_at TIMESTAMP DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS idx_reading_sessions_article ON reading_sessions(article_id);
+
+-- Login lockouts table for limiting failed attempts and tracking blocks
+CREATE TABLE IF NOT EXISTS login_lockouts (
+  id SERIAL PRIMARY KEY,
+  ip VARCHAR(100) NOT NULL,
+  fingerprint VARCHAR(512) NOT NULL,
+  attempt_count INTEGER DEFAULT 0,
+  lockout_count INTEGER DEFAULT 0,
+  locked_until TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_login_lockouts_ip_fingerprint ON login_lockouts(ip, fingerprint);
+CREATE INDEX IF NOT EXISTS idx_login_lockouts_locked ON login_lockouts(locked_until);
+
+-- Captchas table for validating verification codes
+CREATE TABLE IF NOT EXISTS captchas (
+  id VARCHAR(64) PRIMARY KEY,
+  code VARCHAR(10) NOT NULL,
+  expires_at TIMESTAMP NOT NULL
+);
 `;
 
 async function migrate() {

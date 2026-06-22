@@ -47,9 +47,10 @@ export async function handleArticles(req: Request): Promise<Response> {
   }
 
   // GET /api/articles/:slug — single article (must be BEFORE numeric ID routes)
-  const slugMatch = url.pathname.match(/^\/api\/articles\/([a-zA-Z0-9一-鿿\-]+)$/);
+  const slugMatch = url.pathname.match(/^\/api\/articles\/([^\/]+)$/);
   if (slugMatch && req.method === 'GET') {
-    const article = await getArticleBySlug(slugMatch[1]);
+    const slug = decodeURIComponent(slugMatch[1]);
+    const article = await getArticleBySlug(slug);
     if (!article) {
       return Response.json({ success: false, error: 'Not found' }, { status: 404, headers: corsHeaders() });
     }

@@ -138,15 +138,22 @@ class SecurityService {
     }
   }
 
-  public async getLogs(userId: number): Promise<LogEntry[]> {
+  public async getLogs(userId: number, limit?: number): Promise<LogEntry[]> {
     try {
-      const rows = await sql`
-        SELECT event, status, created_at
-        FROM security_logs
-        WHERE user_id = ${userId}
-        ORDER BY created_at DESC
-        LIMIT 30
-      `;
+      const rows = limit !== undefined
+        ? await sql`
+            SELECT event, status, created_at
+            FROM security_logs
+            WHERE user_id = ${userId}
+            ORDER BY created_at DESC
+            LIMIT ${limit}
+          `
+        : await sql`
+            SELECT event, status, created_at
+            FROM security_logs
+            WHERE user_id = ${userId}
+            ORDER BY created_at DESC
+          `;
 
       // If no logs exist yet, insert seed bootstrap logs so the list isn't empty
       if (rows.length === 0) {
@@ -167,7 +174,7 @@ class SecurityService {
         `;
 
         // Re-query
-        return this.getLogs(userId);
+        return this.getLogs(userId, limit);
       }
 
       const pad = (n: number) => String(n).padStart(2, '0');

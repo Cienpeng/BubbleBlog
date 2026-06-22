@@ -8,7 +8,12 @@ interface AuthState {
 }
 
 interface AuthContextType extends AuthState {
-  login: (password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (
+    password: string,
+    captchaCid: string,
+    captchaValue: string,
+    fingerprint: string
+  ) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   updateToken: (newToken: string) => void;
 }
@@ -36,12 +41,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState(prev => ({ ...prev, token: newToken, isLoggedIn: true }));
   }, []);
 
-  const login = useCallback(async (password: string) => {
+  const login = useCallback(async (
+    password: string,
+    captchaCid: string,
+    captchaValue: string,
+    fingerprint: string
+  ) => {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password }),
+        body: JSON.stringify({ password, cid: captchaCid, captcha: captchaValue, fingerprint }),
       });
       const json = await res.json();
       if (json.success) {

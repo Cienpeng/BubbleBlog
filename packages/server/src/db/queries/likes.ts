@@ -7,11 +7,19 @@ export async function getArticleIdBySlug(slug: string): Promise<number | null> {
 }
 
 export async function toggleLike(articleId: number, fingerprint: string): Promise<LikeInfo> {
-  await sql`
-    INSERT INTO likes (article_id, fingerprint)
-    VALUES (${articleId}, ${fingerprint})
-    ON CONFLICT (article_id, fingerprint) DO NOTHING
+  const existing = await sql`
+    SELECT 1 FROM likes WHERE article_id = ${articleId} AND fingerprint = ${fingerprint}
   `;
+  if (existing.length > 0) {
+    await sql`
+      DELETE FROM likes WHERE article_id = ${articleId} AND fingerprint = ${fingerprint}
+    `;
+  } else {
+    await sql`
+      INSERT INTO likes (article_id, fingerprint)
+      VALUES (${articleId}, ${fingerprint})
+    `;
+  }
   return getLikeInfo(articleId, fingerprint);
 }
 

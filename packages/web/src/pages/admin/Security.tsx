@@ -96,6 +96,37 @@ export default function Security() {
     }
   };
 
+  const [exporting, setExporting] = useState(false);
+
+  const handleExportLogs = async () => {
+    if (exporting) return;
+    setExporting(true);
+    try {
+      const token = localStorage.getItem('token') || '';
+      const response = await fetch('/api/admin/security/logs/export', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error('导出失败');
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `audit_logs_${new Date().toISOString().slice(0, 10)}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      alert(err.message || '导出审计日志失败');
+    } finally {
+      setExporting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="animate-pulse space-y-6 max-w-5xl mx-auto">
@@ -247,9 +278,24 @@ export default function Security() {
         {/* Right Column: Security Audit Log */}
         <div className="md:col-span-1 space-y-6">
           <GlassCard className="p-6 space-y-5">
-            <div className="flex items-center gap-2">
-              <IconActivity />
-              <h2 className="text-base font-bold text-text-primary dark:text-white">操作审计日志</h2>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <IconActivity />
+                <h2 className="text-base font-bold text-text-primary dark:text-white">操作审计日志</h2>
+              </div>
+              <button
+                type="button"
+                onClick={handleExportLogs}
+                disabled={exporting}
+                className="text-xs text-brand hover:underline font-bold flex items-center gap-1 focus:outline-none disabled:opacity-50"
+              >
+                <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="7 10 12 15 17 10" />
+                  <line x1="12" y1="15" x2="12" y2="3" />
+                </svg>
+                {exporting ? '导出中...' : '导出'}
+              </button>
             </div>
 
             <div className="relative pl-4 border-l border-black/5 dark:border-white/5 space-y-6 py-2 max-h-[480px] overflow-y-auto">

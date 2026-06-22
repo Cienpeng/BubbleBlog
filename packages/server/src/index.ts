@@ -67,6 +67,10 @@ Bun.serve({
       if (url.pathname.includes('/carousel')) {
         return addSecurityHeaders(await handleCarouselAPI(req));
       }
+      // Likes must be BEFORE /api/articles/ to avoid being eaten by articles handler
+      if (url.pathname.includes('/likes')) {
+        return addSecurityHeaders(await handleLikes(req));
+      }
       if (url.pathname.startsWith('/api/articles/') || url.pathname === '/api/articles') {
         return addSecurityHeaders(await handleArticles(req));
       }
@@ -75,9 +79,6 @@ Bun.serve({
       }
       if (url.pathname.startsWith('/api/search')) {
         return addSecurityHeaders(await handleSearch(req));
-      }
-      if (url.pathname.includes('/likes')) {
-        return addSecurityHeaders(await handleLikes(req));
       }
       if (url.pathname.startsWith('/api/media') || url.pathname.startsWith('/media/')) {
         return addSecurityHeaders(await handleMedia(req));

@@ -3,6 +3,9 @@ import { loginRateLimit } from '../middleware/ratelimit';
 import { createToken } from '../services/jwt';
 import { getUserByUsername, updateLastActive, createUser } from '../db/queries/users';
 import { securityService } from '../services/security';
+import { getLockout, updateLockout, resetLockout } from '../db/queries/lockouts';
+import { saveCaptcha, verifyAndConsumeCaptcha } from '../db/queries/captchas';
+import { generateCaptchaSVG } from '../services/captcha';
 
 async function hashPassword(password: string): Promise<string> {
   return Bun.password.hash(password, { algorithm: 'bcrypt', cost: 12 });
@@ -26,37 +29,127 @@ export async function handleAuth(req: Request, server?: any): Promise<Response> 
 
   const url = new URL(req.url);
 
+  // GET /api/auth/captcha?cid=xxx
+  if (url.pathname === '/api/auth/captcha' && req.method === 'GET') {
+    const cid = url.searchParams.get('cid');
+    if (!cid) {
+      return Response.json(
+        { success: false, error: 'cid parameter is required' },
+        { status: 400, headers: corsHeaders() }
+      );
+    }
+
+    const { text, svg } = generateCaptchaSVG();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+    await saveCaptcha(cid, text, expiresAt);
+
+    return new Response(svg, {
+      headers: {
+        'Content-Type': 'image/svg+xml',
+        ...corsHeaders(),
+      },
+    });
+  }
+
   if (url.pathname === '/api/auth/login' && req.method === 'POST') {
     const rateLimitResponse = loginRateLimit(req);
     if (rateLimitResponse) return rateLimitResponse;
 
     const body = await req.json();
     const password = body.password as string;
+    const cid = body.cid as string;
+    const captcha = body.captcha as string;
+    const fingerprint = (body.fingerprint as string) || req.headers.get('user-agent') || 'default';
+
+    const ip = getClientIp(req, server);
+
+    // 1. Check lockout
+    const lockout = await getLockout(ip, fingerprint);
+    if (lockout && lockout.locked_until) {
+      const lockedUntilTime = new Date(lockout.locked_until).getTime();
+      if (lockedUntilTime > Date.now()) {
+        const remainingMs = lockedUntilTime - Date.now();
+        const remainingMin = Math.ceil(remainingMs / 60000);
+        return Response.json(
+          { success: false, error: `登录错误次数过多，系统已限制登录，请于 ${remainingMin} 分钟后重试` },
+          { status: 423, headers: corsHeaders() }
+        );
+      }
+    }
+
+    // Helper for failed attempt tracking
+    const recordFailedAttempt = async (errMsg: string, isCaptchaError = false) => {
+      let attemptCount = 1;
+      let lockoutCount = 0;
+      if (lockout) {
+        attemptCount = lockout.attempt_count + 1;
+        lockoutCount = lockout.lockout_count;
+      }
+
+      if (attemptCount >= 5) {
+        let durationMin = 5;
+        let nextLockoutCount = lockoutCount + 1;
+        if (lockoutCount === 0) {
+          durationMin = 5;
+        } else if (lockoutCount === 1) {
+          durationMin = 25;
+        } else {
+          durationMin = 1440; // 1 day
+          nextLockoutCount = 0; // Reset cycle
+        }
+        const lockedUntil = new Date(Date.now() + durationMin * 60 * 1000);
+        await updateLockout(ip, fingerprint, 0, nextLockoutCount, lockedUntil);
+        return Response.json(
+          { 
+            success: false, 
+            error: `${errMsg}。连续错误达 5 次，系统已对您的IP或浏览器指纹封禁 ${durationMin === 1440 ? '1 天' : durationMin + ' 分钟'}` 
+          },
+          { status: 423, headers: corsHeaders() }
+        );
+      } else {
+        await updateLockout(ip, fingerprint, attemptCount, lockoutCount, null);
+        return Response.json(
+          { 
+            success: false, 
+            error: `${errMsg}。您还剩 ${5 - attemptCount} 次尝试机会` 
+          },
+          { status: isCaptchaError ? 400 : 401, headers: corsHeaders() }
+        );
+      }
+    };
+
+    // 2. Verify captcha
+    if (!cid || !captcha) {
+      return Response.json(
+        { success: false, error: '请提供验证码' },
+        { status: 400, headers: corsHeaders() }
+      );
+    }
+
+    const captchaValid = await verifyAndConsumeCaptcha(cid, captcha);
+    if (!captchaValid) {
+      return recordFailedAttempt('验证码错误或已过期', true);
+    }
+
+    // 3. Verify password
     if (!password) {
       return Response.json(
-        { success: false, error: 'Password is required' },
+        { success: false, error: '请提供密码' },
         { status: 400, headers: corsHeaders() }
       );
     }
 
     const user = await getUserByUsername('admin');
     if (!user) {
-      // Use same delay and message to prevent user enumeration
       await new Promise(resolve => setTimeout(resolve, 500));
-      return Response.json(
-        { success: false, error: 'Invalid credentials' },
-        { status: 401, headers: corsHeaders() }
-      );
+      return recordFailedAttempt('密码验证失败');
     }
 
     const valid = await Bun.password.verify(password, user.password_hash);
     await new Promise(resolve => setTimeout(resolve, 500));
 
     if (!valid) {
-      return Response.json(
-        { success: false, error: 'Invalid credentials' },
-        { status: 401, headers: corsHeaders() }
-      );
+      return recordFailedAttempt('密码验证失败');
     }
 
     const token = await createToken({ username: user.username, userId: user.id });
@@ -64,7 +157,6 @@ export async function handleAuth(req: Request, server?: any): Promise<Response> 
 
     // Record session and audit log
     const ua = req.headers.get('user-agent') || 'Unknown User-Agent';
-    const ip = getClientIp(req, server);
 
     // If single session is enabled, logout others immediately
     const { getSetting } = require('../db/queries/settings');

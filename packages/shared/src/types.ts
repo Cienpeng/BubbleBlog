@@ -17,6 +17,7 @@ export interface Article {
   cover_image: string | null;
   status: 'draft' | 'published';
   reading_time: number;
+  likes_count?: number;
   published_at: string | null;
   created_at: string;
   updated_at: string;

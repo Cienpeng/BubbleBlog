@@ -154,6 +154,45 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
     );
   }
 
+  // GET /api/admin/security/logs/export
+  if (url.pathname === '/api/admin/security/logs/export' && req.method === 'GET') {
+    const auth = await requireAuth(req);
+    if (!auth.authorized) return auth.response!;
+
+    const payload = await getUserId(req);
+    if (!payload) {
+      return Response.json(
+        { success: false, error: '用户未登录' },
+        { status: 404, headers: corsHeaders() }
+      );
+    }
+
+    const logs = await securityService.getLogs(payload.userId);
+    const escapeCSV = (str: string) => {
+      if (/[",\n\r]/.test(str)) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const header = '时间,操作事件,状态\n';
+    const csvContent = logs.map(log => {
+      const time = escapeCSV(log.time);
+      const event = escapeCSV(log.event);
+      const status = escapeCSV(log.status === 'success' ? '成功' : '警告');
+      return `${time},${event},${status}`;
+    }).join('\n');
+
+    const bom = '\ufeff';
+    return new Response(bom + header + csvContent, {
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="audit_logs.csv"',
+        ...corsHeaders(),
+      },
+    });
+  }
+
   // GET /api/admin/security
   if (url.pathname === '/api/admin/security' && req.method === 'GET') {
     const auth = await requireAuth(req);
@@ -191,7 +230,7 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
     }
 
     const updatedSessions = await securityService.getSessions(payload.userId, currentToken);
-    const logs = await securityService.getLogs(payload.userId);
+    const logs = await securityService.getLogs(payload.userId, 20);
 
     // Get single session setting
     const { getSetting } = require('../db/queries/settings');

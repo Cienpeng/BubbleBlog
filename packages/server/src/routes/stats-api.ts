@@ -1,6 +1,6 @@
 import { corsHeaders, handleCors } from '../middleware/cors';
 import { requireAuth } from '../middleware/auth';
-import { getDailyViews, getAllArticlesReadingStats, getArticleReadingStats } from '../db/queries/stats';
+import { getDailyViews, getAllArticlesReadingStats, getLatestArticlesReadingStats, getArticleReadingStats } from '../db/queries/stats';
 
 export async function handleStatsAPI(req: Request): Promise<Response> {
   const corsResponse = handleCors(req);
@@ -22,7 +22,8 @@ export async function handleStatsAPI(req: Request): Promise<Response> {
 
   // GET /api/admin/stats/articles-reading
   if (url.pathname === '/api/admin/stats/articles-reading' && req.method === 'GET') {
-    const data = await getAllArticlesReadingStats();
+    const limit = url.searchParams.get('limit');
+    const data = limit ? await getLatestArticlesReadingStats(parseInt(limit)) : await getAllArticlesReadingStats();
     return Response.json(
       { success: true, data, newToken: auth.newToken },
       { headers: corsHeaders() }

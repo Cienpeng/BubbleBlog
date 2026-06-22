@@ -102,14 +102,17 @@ export default function BarChart({ data, height = 300 }: BarChartProps) {
           const isDimmed = hoveredIdx !== null && !isHovered;
 
           return (
-            <g key={i} className="cursor-pointer">
+            <g
+              key={i}
+              className="cursor-pointer"
+              onMouseEnter={() => setHoveredIdx(i)}
+              onMouseLeave={() => setHoveredIdx(null)}
+            >
               {/* Transparent hit area (larger) */}
               <rect
                 x={x - 3} y={margin.top}
                 width={barW + 6} height={chartH}
                 fill="transparent"
-                onMouseEnter={() => setHoveredIdx(i)}
-                onMouseLeave={() => setHoveredIdx(null)}
               />
               {/* Bar group with animation */}
               <g
@@ -121,6 +124,7 @@ export default function BarChart({ data, height = 300 }: BarChartProps) {
                       : 'translateY(0px)',
                   transition: 'transform 350ms cubic-bezier(0.34, 1.56, 0.64, 1)',
                   opacity: isDimmed ? 0.38 : 1,
+                  pointerEvents: 'none',
                 }}
               >
                 <rect
