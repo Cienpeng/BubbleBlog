@@ -7,3 +7,4 @@ uploads/
 *.md
 !README.md
 !README*.md
+!samples.md
