@@ -16,7 +16,7 @@ export async function saveCaptcha(id: string, code: string, expiresAt: Date): Pr
 export async function verifyAndConsumeCaptcha(id: string, code: string): Promise<boolean> {
   try {
     const rows = await sql`
-      SELECT code, expires_at
+      SELECT code, (expires_at > NOW()) as is_valid
       FROM captchas
       WHERE id = ${id}
     `;
@@ -29,7 +29,7 @@ export async function verifyAndConsumeCaptcha(id: string, code: string): Promise
       WHERE id = ${id}
     `;
 
-    if (new Date(record.expires_at).getTime() < Date.now()) {
+    if (!record.is_valid) {
       return false;
     }
     return record.code === code.toLowerCase();

@@ -4,10 +4,17 @@ export default function ReadingProgress() {
   const [progress, setProgress] = useState(0);
 
   useEffect(() => {
+    let ticking = false;
     const onScroll = () => {
-      const docH = document.documentElement.scrollHeight - window.innerHeight;
-      if (docH > 0) {
-        setProgress(Math.min(100, (window.scrollY / docH) * 100));
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          const docH = document.documentElement.scrollHeight - window.innerHeight;
+          if (docH > 0) {
+            setProgress(Math.min(100, (window.scrollY / docH) * 100));
+          }
+          ticking = false;
+        });
+        ticking = true;
       }
     };
     window.addEventListener('scroll', onScroll, { passive: true });

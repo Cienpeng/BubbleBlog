@@ -33,6 +33,17 @@ async function adminRequest<T>(url: string, options?: RequestInit): Promise<{ da
   if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const res = await fetch(`${BASE}${url}`, { headers, ...options });
+
+  if (res.status === 401) {
+    let errMsg = '当前登录会话已失效或已被强制下线，请重新登录';
+    try {
+      const json = await res.json();
+      if (json.error) errMsg = json.error;
+    } catch {}
+    window.dispatchEvent(new CustomEvent('auth-unauthorized', { detail: errMsg }));
+    throw new Error(errMsg);
+  }
+
   const json: ApiResponse<T> = await res.json();
   if (!json.success) throw new Error(json.error || 'Request failed');
   return { data: json.data as T, newToken: json.newToken };
@@ -53,7 +64,18 @@ export const adminApi = {
       method: 'POST',
       headers,
       body: formData,
-    }).then(res => res.json()).then(json => {
+    }).then(async res => {
+      if (res.status === 401) {
+        let errMsg = '当前登录会话已失效，请重新登录';
+        try {
+          const json = await res.json();
+          if (json.error) errMsg = json.error;
+        } catch {}
+        window.dispatchEvent(new CustomEvent('auth-unauthorized', { detail: errMsg }));
+        throw new Error(errMsg);
+      }
+      return res.json();
+    }).then(json => {
       if (!json.success) throw new Error(json.error || 'Upload failed');
       return { data: json.data as T, newToken: json.newToken };
     });

@@ -7,13 +7,23 @@ export interface LockoutRecord {
   attempt_count: number;
   lockout_count: number;
   locked_until: Date | null;
+  is_locked: boolean;
+  remaining_seconds: number;
 }
 
 // Find record by ip OR fingerprint
 export async function getLockout(ip: string, fingerprint: string): Promise<LockoutRecord | null> {
   try {
     const rows = await sql`
-      SELECT id, ip, fingerprint, attempt_count, lockout_count, locked_until
+      SELECT 
+        id, 
+        ip, 
+        fingerprint, 
+        attempt_count, 
+        lockout_count, 
+        locked_until,
+        COALESCE(locked_until > NOW(), false) AS is_locked,
+        GREATEST(0, COALESCE(EXTRACT(EPOCH FROM (locked_until - NOW()))::int, 0)) AS remaining_seconds
       FROM login_lockouts
       WHERE ip = ${ip} OR fingerprint = ${fingerprint}
       ORDER BY locked_until DESC NULLS LAST, attempt_count DESC

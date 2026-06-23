@@ -70,6 +70,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState({ isLoggedIn: false, token: null, username: null });
   }, []);
 
+  useEffect(() => {
+    const handleUnauthorized = (e: Event) => {
+      const detail = (e as CustomEvent).detail || '当前登录会话已失效，请重新登录';
+      if (localStorage.getItem('token')) {
+        alert(detail);
+        logout();
+      }
+    };
+    window.addEventListener('auth-unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth-unauthorized', handleUnauthorized);
+  }, [logout]);
+
   return (
     <AuthContext.Provider value={{ ...state, login, logout, updateToken }}>
       {children}

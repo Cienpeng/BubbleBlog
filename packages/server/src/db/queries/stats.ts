@@ -5,7 +5,9 @@ import sql from '../connection';
 export async function recordPageView(articleId: number, fingerprint: string): Promise<void> {
   await sql`
     INSERT INTO page_views (article_id, fingerprint, visited_at)
-    VALUES (${articleId}, ${fingerprint}, NOW())
+    SELECT ${articleId}, ${fingerprint}, NOW()
+    FROM articles
+    WHERE id = ${articleId} AND status = 'published'
   `;
 }
 
@@ -37,7 +39,9 @@ export async function recordReadingSession(
   if (durationSeconds < 1 || durationSeconds > 7200) return; // Ignore <1s or >2h
   await sql`
     INSERT INTO reading_sessions (article_id, fingerprint, duration_seconds, created_at)
-    VALUES (${articleId}, ${fingerprint}, ${durationSeconds}, NOW())
+    SELECT ${articleId}, ${fingerprint}, ${durationSeconds}, NOW()
+    FROM articles
+    WHERE id = ${articleId} AND status = 'published'
   `;
 }
 

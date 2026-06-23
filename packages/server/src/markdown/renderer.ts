@@ -1,8 +1,12 @@
 import MarkdownIt from 'markdown-it';
+import katex from '@vscode/markdown-it-katex';
+import taskLists from 'markdown-it-task-lists';
+import footnote from 'markdown-it-footnote';
+import mark from 'markdown-it-mark';
 
-// Safe configuration: no raw HTML
+// Configure MarkdownIt: allow raw HTML for colors/background custom styling
 const md = new MarkdownIt({
-  html: false,        // Disable raw HTML
+  html: true,         // Enable raw HTML
   linkify: true,      // Auto-link URLs
   typographer: true,  // Smart quotes, dashes
   breaks: true,       // Convert \n to <br>
@@ -15,6 +19,12 @@ const md = new MarkdownIt({
     return `<pre><code class="language-${lang || 'plaintext'}">${escaped}</code></pre>`;
   },
 });
+
+// Register plugins
+md.use(katex)
+  .use(taskLists, { label: true })
+  .use(footnote)
+  .use(mark);
 
 // Basic XSS sanitization (DOMPurify runs on frontend as well)
 function sanitize(html: string): string {

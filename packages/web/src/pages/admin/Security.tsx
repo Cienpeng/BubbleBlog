@@ -241,7 +241,7 @@ export default function Security() {
                   }`}
                 >
                   <div className="mt-0.5">
-                    {session.device.includes('PC') || session.device.includes('Mac') || session.device.includes('Win') ? (
+                    {session.device?.includes('PC') || session.device?.includes('Mac') || session.device?.includes('Win') ? (
                       <IconLaptop />
                     ) : (
                       <IconSmartphone />

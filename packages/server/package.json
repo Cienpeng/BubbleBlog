@@ -11,7 +11,11 @@
   },
   "dependencies": {
     "@bubbleblog/shared": "workspace:*",
+    "@vscode/markdown-it-katex": "^1.1.2",
     "markdown-it": "^14.0.0",
+    "markdown-it-footnote": "^4.0.0",
+    "markdown-it-mark": "^4.0.0",
+    "markdown-it-task-lists": "^2.1.1",
     "postgres": "^3.4.0"
   },
   "devDependencies": {

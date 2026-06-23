@@ -7,6 +7,7 @@ import ArticleCard from '@/components/ArticleCard';
 import TagCloud from '@/components/TagCloud';
 import GlassCard from '@/components/GlassCard';
 import { IconUser, IconCalendar } from '@/components/Icons';
+import { useObfuscatedImage } from '@/hooks/useObfuscatedImage';
 
 const ROTATIONS = [-0.3, 0.8, -1.0, 0.4, -0.6, 0.3, -0.7, 0.5, -0.4, 0.2];
 
@@ -135,6 +136,8 @@ function parseBioAndSocials(rawBio: string | null) {
 }
 
 export default function HomePage() {
+  const authorCardBanner = useObfuscatedImage('/author-card-banner.dat');
+  const authorCardBannerSticky = useObfuscatedImage('/author-card-banner-sticky.dat');
   const [articles, setArticles] = useState<ArticleListItem[]>([]);
   const [tags, setTags] = useState<Tag[]>([]);
   const [author, setAuthor] = useState<AuthorInfo | null>(null);
@@ -193,8 +196,15 @@ export default function HomePage() {
   };
 
   useEffect(() => {
+    let ticking = false;
     const handleScrollOrResize = () => {
-      updatePosition();
+      if (!ticking) {
+        window.requestAnimationFrame(() => {
+          updatePosition();
+          ticking = false;
+        });
+        ticking = true;
+      }
     };
 
     window.addEventListener('scroll', handleScrollOrResize, { passive: true });
@@ -306,12 +316,14 @@ export default function HomePage() {
 
         <aside className="lg:w-[25%] flex-shrink-0 space-y-4">
           <div className="relative author-banner-container">
-            <img 
-              src="/author-card-banner.png" 
-              alt="" 
-              className="absolute bottom-full right-0 w-1/2 h-auto object-contain z-20 pointer-events-none"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-            />
+            {authorCardBanner && (
+              <img 
+                src={authorCardBanner} 
+                alt="" 
+                className="absolute bottom-full right-0 w-1/2 h-auto object-contain z-20 pointer-events-none"
+                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+              />
+            )}
             <GlassCard className="p-6 text-center relative overflow-hidden">
             {author?.avatar_url ? (
               <div className="relative w-20 h-20 mx-auto mb-4 rounded-full ring-4 ring-brand/15 ring-offset-2 dark:ring-offset-black overflow-hidden shadow-sm">
@@ -420,23 +432,25 @@ export default function HomePage() {
         </aside>
       </div>
 
-      <img
-        ref={imgRef}
-        src="/author-card-banner-sticky.png"
-        alt=""
-        onLoad={handleImageLoad}
-        onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-        style={{
-          position: 'fixed',
-          left: `${imgStyle.left}px`,
-          width: `${imgStyle.width}px`,
-          top: `${imgStyle.top}px`,
-          opacity: imgStyle.visible ? 1 : 0,
-          pointerEvents: 'none',
-          zIndex: 30,
-          transition: 'opacity 0.2s ease-in-out',
-        }}
-      />
+      {authorCardBannerSticky && (
+        <img
+          ref={imgRef}
+          src={authorCardBannerSticky}
+          alt=""
+          onLoad={handleImageLoad}
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+          style={{
+            position: 'fixed',
+            left: `${imgStyle.left}px`,
+            width: `${imgStyle.width}px`,
+            top: `${imgStyle.top}px`,
+            opacity: imgStyle.visible ? 1 : 0,
+            pointerEvents: 'none',
+            zIndex: 30,
+            transition: 'opacity 0.2s ease-in-out',
+          }}
+        />
+      )}
     </div>
   );
 }

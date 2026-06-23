@@ -3,13 +3,15 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
+    "obfuscate": "bun scripts/obfuscate.ts",
+    "dev": "bun scripts/obfuscate.ts && vite",
+    "build": "bun scripts/obfuscate.ts && tsc && vite build",
     "preview": "vite preview"
   },
   "dependencies": {
     "@bubbleblog/shared": "workspace:*",
     "highlight.js": "^11.9.0",
+    "katex": "^0.17.0",
     "marked": "^18.0.5",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

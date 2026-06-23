@@ -4,7 +4,17 @@ import { getCarouselForArticle, addCarouselImage, deleteCarouselImage } from '..
 import { getAllDefaultCarousel, addDefaultCarouselImage } from '../db/queries/carousel';
 import { deleteLocalMedia } from './media';
 import sql from '../db/connection';
+import { verifyToken } from '../services/jwt';
 
+async function getUserId(req: Request): Promise<{ userId: number; username: string } | null> {
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  try {
+    return verifyToken(authHeader.slice(7));
+  } catch (e) {
+    return null;
+  }
+}
 
 export async function handleCarouselAPI(req: Request): Promise<Response> {
   const corsResponse = handleCors(req);
@@ -16,6 +26,16 @@ export async function handleCarouselAPI(req: Request): Promise<Response> {
   const match = url.pathname.match(/^\/api\/articles\/([^\/]+)\/carousel$/);
   if (match && req.method === 'GET') {
     const slug = decodeURIComponent(match[1]);
+
+    // Security check: draft articles carousel details are private and only viewable by authenticated admins
+    const articleRows = await sql`SELECT status FROM articles WHERE slug = ${slug}`;
+    if (articleRows.length > 0 && articleRows[0].status === 'draft') {
+      const user = await getUserId(req);
+      if (!user) {
+        return Response.json({ success: false, error: 'Not found' }, { status: 404, headers: corsHeaders() });
+      }
+    }
+
     const images = await getCarouselForArticle(slug);
 
     const result = images.map(img => ({

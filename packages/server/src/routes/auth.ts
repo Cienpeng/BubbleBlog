@@ -65,16 +65,12 @@ export async function handleAuth(req: Request, server?: any): Promise<Response> 
 
     // 1. Check lockout
     const lockout = await getLockout(ip, fingerprint);
-    if (lockout && lockout.locked_until) {
-      const lockedUntilTime = new Date(lockout.locked_until).getTime();
-      if (lockedUntilTime > Date.now()) {
-        const remainingMs = lockedUntilTime - Date.now();
-        const remainingMin = Math.ceil(remainingMs / 60000);
-        return Response.json(
-          { success: false, error: `登录错误次数过多，系统已限制登录，请于 ${remainingMin} 分钟后重试` },
-          { status: 423, headers: corsHeaders() }
-        );
-      }
+    if (lockout && lockout.is_locked) {
+      const remainingMin = Math.ceil(lockout.remaining_seconds / 60);
+      return Response.json(
+        { success: false, error: `登录错误次数过多，系统已限制登录，请于 ${remainingMin} 分钟后重试` },
+        { status: 423, headers: corsHeaders() }
+      );
     }
 
     // Helper for failed attempt tracking

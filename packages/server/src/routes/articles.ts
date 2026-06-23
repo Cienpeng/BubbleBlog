@@ -54,6 +54,15 @@ export async function handleArticles(req: Request): Promise<Response> {
     if (!article) {
       return Response.json({ success: false, error: 'Not found' }, { status: 404, headers: corsHeaders() });
     }
+
+    // Security check: draft articles are private and only viewable by authenticated admins
+    if (article.status === 'draft') {
+      const user = await getUserId(req);
+      if (!user) {
+        return Response.json({ success: false, error: 'Not found' }, { status: 404, headers: corsHeaders() });
+      }
+    }
+
     return Response.json({ success: true, data: article }, { headers: corsHeaders() });
   }
 
@@ -68,6 +77,27 @@ export async function handleArticles(req: Request): Promise<Response> {
       { success: true, data: articles, newToken: auth.newToken },
       { headers: corsHeaders() }
     );
+  }
+
+  // POST /api/articles/render
+  if (url.pathname === '/api/articles/render' && req.method === 'POST') {
+    const auth = await requireAuth(req);
+    if (!auth.authorized) return auth.response!;
+
+    try {
+      const body = await req.json();
+      const markdown = body.markdown || '';
+      const rendered = renderMarkdown(markdown);
+      return Response.json(
+        { success: true, data: { html: rendered.html }, newToken: auth.newToken },
+        { headers: corsHeaders() }
+      );
+    } catch (e) {
+      return Response.json(
+        { success: false, error: 'Failed to render markdown' },
+        { status: 400, headers: corsHeaders() }
+      );
+    }
   }
 
   // POST /api/articles/upload

@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { IconArrowLeft, IconTrash, IconSave, IconRocket } from '@/components/Icons';
 import { adminApi } from '@/lib/api';
 import { marked } from 'marked';
+import { enhanceCodeBlocks } from '@/lib/markdown';
 
 // Configure marked for safe rendering
 marked.setOptions({ breaks: true, gfm: true });
@@ -40,6 +41,7 @@ export default function ArticleEditor() {
   const [savedAt, setSavedAt] = useState<Date | null>(null);
   const [error, setError] = useState('');
   const previewTimer = useRef<ReturnType<typeof setTimeout>>();
+  const previewRef = useRef<HTMLDivElement>(null);
 
   // Editor Preferences
   const autoSaveEnabled = localStorage.getItem('editor_autosave_enabled') !== 'false';
@@ -63,29 +65,45 @@ export default function ArticleEditor() {
         setTags(data.tags?.map(t => t.name) || []);
         lastSavedMarkdown.current = data.content_md || '';
         lastSavedTitle.current = data.title || '';
-      } catch (err) {
-        setError('加载文章失败');
+      } catch (err: any) {
+        console.error('Failed to load article:', err);
+        setError(`加载文章失败: ${err.message || err}`);
       }
     })();
   }, [id, isNew, updateToken]);
 
-  // Live preview with debounce
+  // Live preview with debounce using backend rendering
   useEffect(() => {
     clearTimeout(previewTimer.current);
     previewTimer.current = setTimeout(() => {
-      try {
-        if (markdown.trim()) {
-          const html = marked.parse(markdown) as string;
-          setPreviewHtml(html);
-        } else {
-          setPreviewHtml('');
-        }
-      } catch {
-        setPreviewHtml('<p class="text-red-500">Markdown 解析错误</p>');
+      if (markdown.trim()) {
+        adminApi.post<{ html: string }>('/api/articles/render', { markdown })
+          .then(({ data, newToken }) => {
+            if (newToken) updateToken(newToken);
+            setPreviewHtml(data.html);
+          })
+          .catch(() => {
+            // Fallback to client-side marked
+            try {
+              const html = marked.parse(markdown) as string;
+              setPreviewHtml(html);
+            } catch {
+              setPreviewHtml('<p class="text-red-500">Markdown 解析错误</p>');
+            }
+          });
+      } else {
+        setPreviewHtml('');
       }
-    }, 300);
+    }, 350);
     return () => clearTimeout(previewTimer.current);
-  }, [markdown]);
+  }, [markdown, updateToken]);
+
+  // Enhance code blocks inside preview when HTML updates
+  useEffect(() => {
+    if (previewHtml && previewRef.current) {
+      enhanceCodeBlocks(previewRef.current);
+    }
+  }, [previewHtml]);
 
   const save = useCallback(async () => {
     setSaving(true);
@@ -155,6 +173,46 @@ export default function ArticleEditor() {
       setSaving(false);
     }
   }, [article, updateToken]);
+
+  const saveAndPublish = useCallback(async () => {
+    setSaving(true);
+    setError('');
+    try {
+      let currentArticle = article;
+      let nextTokenToUse: string | undefined;
+
+      if (isNew) {
+        // Create new article first
+        const { data, newToken } = await adminApi.post<Article>('/api/articles/upload', {
+          title,
+          content_md: markdown,
+          tags,
+        });
+        currentArticle = data;
+        nextTokenToUse = newToken;
+        if (newToken) updateToken(newToken);
+        setArticle(data);
+        setSavedAt(new Date());
+        lastSavedMarkdown.current = markdown;
+        lastSavedTitle.current = data.title || '';
+        // Replace URL with the new article ID
+        navigate(`/admin/articles/${data.id}/edit`, { replace: true });
+      }
+
+      if (currentArticle) {
+        // Publish it
+        const { data: publishedArticle, newToken } = await adminApi.put<Article>(`/api/articles/${currentArticle.id}/publish`);
+        const finalToken = newToken || nextTokenToUse;
+        if (finalToken) updateToken(finalToken);
+        setArticle(publishedArticle);
+        setSavedAt(new Date());
+      }
+    } catch (err: any) {
+      setError(err.message || '发布失败');
+    } finally {
+      setSaving(false);
+    }
+  }, [isNew, id, title, markdown, tags, article, navigate, updateToken]);
 
   const handleDelete = useCallback(async () => {
     if (!article) return;
@@ -246,7 +304,7 @@ export default function ArticleEditor() {
         {!focusMode && (
           <div className="flex-1 flex flex-col min-w-0">
             <div className="mb-2 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">预览</div>
-            <div className="flex-1 rounded-2xl p-5 overflow-y-auto bg-white/40 dark:bg-white/[0.02] border border-black/5 dark:border-white/[0.06]">
+            <div ref={previewRef} className="flex-1 rounded-2xl p-5 overflow-y-auto bg-white/40 dark:bg-white/[0.02] border border-black/5 dark:border-white/[0.06]">
               {previewHtml ? (
                 <article
                   className="prose prose-sm dark:prose-invert max-w-none"
@@ -306,19 +364,26 @@ export default function ArticleEditor() {
             disabled={saving}
             className="inline-flex items-center gap-1.5 px-5 py-2 rounded-2xl bg-white/60 dark:bg-white/[0.04] border border-black/5 dark:border-white/[0.06] text-sm font-medium text-text-primary dark:text-white/80 hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors disabled:opacity-50"
           >
-            {saving ? '保存中...' : <><IconSave size={14} /> 保存草稿</>}
+            {saving ? '保存中...' : (
+              article?.status === 'published' ? <><IconSave size={14} /> 确认修改</> : <><IconSave size={14} /> 保存草稿</>
+            )}
           </button>
-          {article && (
+          
+          {(isNew || article?.status === 'draft') ? (
+            <button
+              onClick={isNew ? saveAndPublish : toggleStatus}
+              disabled={saving}
+              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-2xl text-sm font-semibold transition-colors disabled:opacity-50 bg-brand text-white hover:bg-brand-dark shadow-md shadow-brand/25"
+            >
+              <IconRocket size={14} /> 发布
+            </button>
+          ) : (
             <button
               onClick={toggleStatus}
               disabled={saving}
-              className={`inline-flex items-center gap-1.5 px-5 py-2 rounded-2xl text-sm font-semibold transition-colors disabled:opacity-50 ${
-                article.status === 'draft'
-                  ? 'bg-brand text-white hover:bg-brand-dark shadow-md shadow-brand/25'
-                  : 'bg-amber-500 text-white hover:bg-amber-600'
-              }`}
+              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-2xl text-sm font-semibold transition-colors disabled:opacity-50 bg-amber-500 text-white hover:bg-amber-600"
             >
-              {article.status === 'draft' ? <><IconRocket size={14} /> 发布</> : '取消发布'}
+              取消发布
             </button>
           )}
         </div>

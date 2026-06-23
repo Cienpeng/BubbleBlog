@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { IconUpload, IconPlus, IconArticles, IconHeart } from '@/components/Icons';
@@ -30,6 +30,27 @@ export default function Dashboard() {
   const [stats, setStats] = useState<Stats>({ drafts: 0, published: 0, totalLikes: 0 });
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<number | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [tagFilter, setTagFilter] = useState<string>('all');
+  const [availableTags, setAvailableTags] = useState<{ id: number; name: string; slug: string }[]>([]);
+
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const [tagDropdownOpen, setTagDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement | null>(null);
+  const tagDropdownRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setStatusDropdownOpen(false);
+      }
+      if (tagDropdownRef.current && !tagDropdownRef.current.contains(event.target as Node)) {
+        setTagDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchData = useCallback(async () => {
     try {
@@ -52,6 +73,24 @@ export default function Dashboard() {
   }, [updateToken]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  // Load available tags for filter dropdown
+  useEffect(() => {
+    (async () => {
+      try {
+        const { data } = await adminApi.get<{ id: number; name: string; slug: string }[]>('/api/tags');
+        setAvailableTags(data || []);
+      } catch (err) {
+        console.error('Failed to fetch tags for dashboard:', err);
+      }
+    })();
+  }, []);
+
+  const filteredArticles = articles.filter(article => {
+    const matchesStatus = statusFilter === 'all' || article.status === statusFilter;
+    const matchesTag = tagFilter === 'all' || article.tags?.some(t => t.slug === tagFilter);
+    return matchesStatus && matchesTag;
+  });
 
   const togglePublish = useCallback(async (article: Article) => {
     setActionLoading(article.id);
@@ -153,6 +192,134 @@ export default function Dashboard() {
         ))}
       </div>
 
+      {/* Filter Bar */}
+      {!loading && articles.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 px-5 py-3 rounded-2xl bg-white/40 dark:bg-white/[0.02] border border-black/5 dark:border-white/[0.06] backdrop-blur-sm animate-fade-in relative z-30">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wider">筛选</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">
+              (显示 {filteredArticles.length} 篇)
+            </span>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {/* Status Filter */}
+            <div className="relative" ref={statusDropdownRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setStatusDropdownOpen(!statusDropdownOpen);
+                  setTagDropdownOpen(false);
+                }}
+                className="flex items-center justify-between text-xs pl-3.5 pr-8 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 outline-none text-text-primary dark:text-white/80 cursor-pointer font-medium hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors min-w-[96px] relative"
+              >
+                <span>
+                  {statusFilter === 'all' ? '所有状态' : statusFilter === 'published' ? '已发布' : '草稿'}
+                </span>
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500">
+                  <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${statusDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </span>
+              </button>
+
+              {statusDropdownOpen && (
+                <div className="absolute right-0 mt-1.5 w-full min-w-[100px] bg-white dark:bg-zinc-950 border border-black/10 dark:border-white/10 rounded-xl py-1 shadow-lg z-20 animate-fade-in">
+                  {[
+                    { value: 'all', label: '所有状态' },
+                    { value: 'published', label: '已发布' },
+                    { value: 'draft', label: '草稿' }
+                  ].map(opt => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => {
+                        setStatusFilter(opt.value);
+                        setStatusDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors block ${
+                        statusFilter === opt.value
+                          ? 'bg-brand/10 text-brand font-bold dark:bg-brand/20 dark:text-brand-light'
+                          : 'text-text-primary dark:text-white/80 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Tag Filter */}
+            <div className="relative" ref={tagDropdownRef}>
+              <button
+                type="button"
+                onClick={() => {
+                  setTagDropdownOpen(!tagDropdownOpen);
+                  setStatusDropdownOpen(false);
+                }}
+                className="flex items-center justify-between text-xs pl-3.5 pr-8 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 outline-none text-text-primary dark:text-white/80 cursor-pointer font-medium hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors min-w-[100px] relative"
+              >
+                <span>
+                  {tagFilter === 'all' ? '所有标签' : (availableTags.find(t => t.slug === tagFilter)?.name || '所有标签')}
+                </span>
+                <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500">
+                  <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${tagDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </span>
+              </button>
+
+              {tagDropdownOpen && (
+                <div className="absolute right-0 mt-1.5 w-full min-w-[110px] bg-white dark:bg-zinc-950 border border-black/10 dark:border-white/10 rounded-xl py-1 shadow-lg z-20 animate-fade-in max-h-48 overflow-y-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTagFilter('all');
+                      setTagDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-3 py-1.5 text-xs transition-colors block ${
+                      tagFilter === 'all'
+                        ? 'bg-brand/10 text-brand font-bold dark:bg-brand/20 dark:text-brand-light'
+                        : 'text-text-primary dark:text-white/80 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                    }`}
+                  >
+                    所有标签
+                  </button>
+                  {availableTags.map(tag => (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => {
+                        setTagFilter(tag.slug);
+                        setTagDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-1.5 text-xs transition-colors block ${
+                        tagFilter === tag.slug
+                          ? 'bg-brand/10 text-brand font-bold dark:bg-brand/20 dark:text-brand-light'
+                          : 'text-text-primary dark:text-white/80 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
+                      }`}
+                    >
+                      {tag.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Reset Filters */}
+            {(statusFilter !== 'all' || tagFilter !== 'all') && (
+              <button
+                onClick={() => { setStatusFilter('all'); setTagFilter('all'); }}
+                className="text-xs font-semibold text-brand hover:text-brand-dark dark:hover:text-brand-light transition-colors"
+              >
+                重置
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Article grid */}
       {loading ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -171,9 +338,20 @@ export default function Dashboard() {
             <IconPlus size={15} /> 写新文章
           </button>
         </div>
+      ) : filteredArticles.length === 0 ? (
+        <div className="text-center py-20 animate-fade-in">
+          <div className="mb-4"><IconArticles size={36} className="text-gray-300 dark:text-gray-600" /></div>
+          <p className="text-gray-400 text-sm">没有符合当前筛选条件的文章</p>
+          <button
+            onClick={() => { setStatusFilter('all'); setTagFilter('all'); }}
+            className="inline-flex items-center gap-1.5 mt-4 px-4 py-2 rounded-xl bg-white/60 dark:bg-white/[0.04] border border-black/5 dark:border-white/[0.06] text-xs font-medium text-brand hover:bg-black/[0.02] dark:hover:bg-white/[0.04] transition-colors"
+          >
+            重置筛选条件
+          </button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {articles.map(article => (
+          {filteredArticles.map(article => (
             <div
               key={article.id}
               className="group glass rounded-2xl p-5 card-tilt animate-slide-up"
