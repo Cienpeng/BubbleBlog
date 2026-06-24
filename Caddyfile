@@ -1,47 +1,93 @@
-  你的公网IP {
-      root * /你的项目路径/packages/web/dist
-      encode gzip
-
-      request_body {
-          max_size 50MB
-      }
-      log {
-          output file /var/log/caddy/access.log
-      }
-      # HTML 不缓存，确保每次都拉最新
-      header /index.html {
-          Cache-Control "no-cache, no-store, must-revalidate"
-      }
-      # 上传的图片缓存 7 天
-      header /media/* {
-          Cache-Control "public, max-age=604800"
-      }
-      # 带哈希的 JS/CSS 资源缓存一年（文件名变了自动失效）
-      header /assets/* {
-          Cache-Control "public, max-age=31536000, immutable"
-      }
-
-      handle /api/* {
-          reverse_proxy localhost:3000
-      }
-       handle /media/* {
-          reverse_proxy localhost:3000
-      }
-      handle /sitemap.xml {
-          reverse_proxy localhost:3000
-      }
-
-      # SPA fallback
-      handle {
-          try_files {path} /index.html
-          file_server
-      }
-      header {
-          X-Content-Type-Options "nosniff"
-          X-Frame-Options "DENY"
-          Referrer-Policy "strict-origin-when-cross-origin"
-      }
-
-      @scanners path /wp-admin* /.env* /phpmyadmin* /.git*
-      respond @scanners 404
+  {
+      email 邮箱
   }
+  {
+    trusted_proxies static private_ranges
+  }
+  ip或域名 {
+    # ============================================
+    # 1. Let's Encrypt 验证（必须放行）
+    # ============================================
+    handle /.well-known/acme-challenge/* {
+        file_server
+    }
+
+    # ============================================
+    # 2. 扫描器/攻击路径直接返回 404
+    # ============================================
+    @scanners {
+        path /wp-admin* /.env* /phpmyadmin* /.git*
+    }
+    respond @scanners 404
+
+
+    # 站点根目录
+    root * 项目目录/packages/web/dist
+
+    # 启用 gzip 压缩
+    encode gzip
+
+    # 请求体大小限制
+    request_body {
+        max_size 50MB
+    }
+
+    # ---------- 缓存策略 ----------
+    # HTML 不缓存
+    header /index.html {
+        Cache-Control "no-cache, no-store, must-revalidate"
+    }
+
+    @datFiles {
+    path *.dat
+    }
+    header @datFiles {
+     Cache-Control "public, max-age=604800"
+    }
+
+    # 图片缓存 7 天
+    header /media/* {
+        Cache-Control "public, max-age=604800"
+    }
+
+    # 带哈希的 JS/CSS 缓存 1 年
+    header /assets/* {
+        Cache-Control "public, max-age=31536000, immutable"
+    }
+
+    # ---------- 路由 ----------
+    # API 请求转发到后端
+    handle /api/* {
+        reverse_proxy localhost:3000
+    }
+
+    # 媒体文件转发到后端
+    handle /media/* {
+        reverse_proxy localhost:3000
+    }
+
+    # sitemap 转发到后端
+    handle /sitemap.xml {
+        reverse_proxy localhost:3000
+    }
+
+    # SPA fallback：所有其他请求返回 index.html
+    handle {
+        try_files {path} /index.html
+        file_server
+    }
+
+    # ---------- 安全响应头 ----------
+    header {
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+    }
+
+    # ============================================
+    # 4. 访问日志
+    # ============================================
+    log {
+        output file /var/log/caddy/access.log
+    }
+}

@@ -72,7 +72,7 @@ packages/server/
     │   └── ratelimit.ts       # 内存限流器（全局 100/min，登录 5/15min，点赞 10/min）
     │
     ├── routes/
-    │   ├── articles.ts        # 文章 CRUD 端点 + Markdown 文件上传
+    │   ├── articles.ts        # 文章 CRUD 端点 + Markdown 文件上传 + 渲染
     │   ├── auth.ts            # 登录校验、验证码获取 API + 一次性管理员账户初始化
     │   ├── carousel-api.ts    # 轮播图 CRUD（公开 + 管理员）
     │   ├── likes.ts           # 点赞 POST/GET（按文章 slug）
@@ -96,59 +96,64 @@ packages/server/
 | 路由 | 方法 | 认证 | 说明 |
 |------|------|------|------|
 | `/api/health` | GET | — | 健康检查 |
-| `/api/auth/captcha` | GET | — | 获取验证码 SVG 图像 (需携带 `cid` 参数) |
-| `/api/auth/login` | POST | — | 密码登录 (校验验证码、防暴力破解锁定) |
-| `/api/auth/setup` | POST | — | 一次性管理员初始化创建 |
-| `/api/articles` | GET | — | 分页已发布文章列表 |
-| `/api/articles/admin/all` | GET | 是 | 全部文章列表（管理员卡片面板加载） |
-| `/api/articles/upload` | POST | 是 | Markdown 文件 / JSON 创建文章 |
-| `/api/articles/:slug` | GET | — | 按 slug 获取单篇文章 |
+| `/api/auth/captcha` | GET | — | 获取验证码 SVG 图像（需携带 `cid` 参数，有效期 5 分钟） |
+| `/api/auth/login` | POST | — | 密码登录（校验验证码、防暴力破解锁定；连续 5 次失败后按 5 分钟 → 25 分钟 → 1 天递增封禁） |
+| `/api/auth/setup` | POST | — | 一次性管理员初始化创建（密码至少 8 位） |
+| `/api/articles` | GET | — | 分页已发布文章列表（支持 `page`、`limit`、`offset`、`tag` 查询参数） |
+| `/api/articles/admin/all` | GET | 是 | 全部文章列表（含草稿，供管理面板使用） |
+| `/api/articles/render` | POST | 是 | 渲染 Markdown 为 HTML（实时预览） |
+| `/api/articles/upload` | POST | 是 | Markdown 文件 / JSON 创建文章（支持 frontmatter 自动解析标题、摘要、封面图和标签） |
+| `/api/articles/:slug` | GET | — | 按 slug 获取单篇文章（草稿仅认证管理员可见） |
 | `/api/articles/:id` | PUT/DELETE | 是 | 更新 / 删除文章 |
 | `/api/articles/:id/publish` | PUT | 是 | 发布草稿 |
-| `/api/articles/:id/unpublish` | PUT | 是 | 取消发布 |
-| `/api/articles/:id/preview` | GET | 是 | 预览草稿 |
-| `/api/articles/:slug/carousel` | GET | — | 文章专属轮播图 |
-| `/api/articles/:slug/likes` | GET/POST | — | 点赞计数查询 / 点赞切换状态 |
-| `/api/tags` | GET | — | 全部标签列表（含文章计数） |
-| `/api/search` | GET | — | 全文搜索 |
-| `/api/settings` | GET/PUT | PUT 需认证 | 站点外观设置（包括背景图片 URL 等） |
-| `/api/media/upload` | POST | 是 | 图片本地上传及裁剪裁剪图上传 |
+| `/api/articles/:id/unpublish` | PUT | 是 | 取消发布（下架已发布文章） |
+| `/api/articles/:id/preview` | GET | 是 | 预览草稿全文 |
+| `/api/articles/:slug/carousel` | GET | — | 文章专属轮播图（草稿文章仅认证管理员可查看） |
+| `/api/articles/:slug/likes` | GET | — | 点赞计数与当前设备点赞状态查询（通过 `fingerprint` 参数区分设备） |
+| `/api/articles/:slug/likes` | POST | — | 点赞状态切换（请求体需携带 `fingerprint`，受 10/min 限流） |
+| `/api/tags` | GET | — | 全部标签列表（含各标签文章计数） |
+| `/api/search` | GET | — | 全文搜索（基于 PostgreSQL tsvector，参数 `q`） |
+| `/api/settings` | GET | — | 获取站点外观设置 |
+| `/api/settings` | PUT | 是 | 修改站点设置（当前支持 `background_image`，自动清理被替换的旧图片） |
+| `/api/media/upload` | POST | 是 | 图片上传（magic byte 校验，仅允许 JPEG/PNG/WebP/GIF，限 2MB） |
 | `/media/:filename` | GET | — | 静态上传文件服务 |
-| `/api/admin/carousel` | GET/POST | 是 | 默认轮播图图片 CRUD |
-| `/api/admin/carousel/:id` | DELETE | 是 | 删除指定的轮播图记录和磁盘物理文件 |
-| `/api/admin/stats/views` | GET | 是 | 每日浏览统计图表数据 |
-| `/api/admin/stats/articles-reading`| GET | 是 | 每篇文章阅读对比数据 (支持 `limit` 参数) |
-| `/api/admin/stats/reading/:id` | GET | 是 | 单篇文章阅读统计 (按需加载单个 DonutChart) |
-| `/api/admin/profile` | GET/PUT | 是 | 管理员资料修改 |
-| `/api/admin/password` | PUT | 是 | 修改密码 |
-| `/api/admin/security` | GET | 是 | 获取活跃会话、审计历史日志 (限制最新 20 条) |
-| `/api/admin/security/toggle-single-session` | POST | 是 | 开启/关闭单终端登录限制 (SSO 限制) |
-| `/api/admin/security/logout-others` | POST | 是 | 清除并强制注销其他设备的在线活跃会话 |
-| `/api/admin/security/logs/export`| GET | 是 | 导出完整历史审计日志为 CSV 文件 (带 UTF-8 BOM) |
-| `/api/profile` | GET | — | 作者公开资料获取 |
-| `/api/track/view` | POST | — | 记录文章浏览量 |
-| `/api/track/reading` | POST | — | 记录阅读会话时长 (基于 Beacon API 保证离开页面发送) |
-| `/sitemap.xml` | GET | — | SEO 自动站点地图 |
+| `/api/admin/carousel` | GET | 是 | 获取所有默认轮播图 |
+| `/api/admin/carousel` | POST | 是 | 添加默认轮播图（上限 5 张，超出后自动替换最早的一张） |
+| `/api/admin/carousel/:id` | DELETE | 是 | 删除指定轮播图（同时清理磁盘文件） |
+| `/api/admin/stats/views` | GET | 是 | 每日浏览统计（支持 `days` 参数，默认 30 天） |
+| `/api/admin/stats/articles-reading` | GET | 是 | 每篇文章阅读统计（支持 `limit` 参数限制返回条数） |
+| `/api/admin/stats/reading/:id` | GET | 是 | 单篇文章阅读详情 |
+| `/api/admin/profile` | GET | 是 | 获取管理员完整资料 |
+| `/api/admin/profile` | PUT | 是 | 修改管理员资料（display_name、bio、avatar_url、tags，自动清理旧头像文件） |
+| `/api/admin/password` | PUT | 是 | 修改登录密码（需提供当前密码，新密码至少 8 位） |
+| `/api/admin/security` | GET | 是 | 获取安全中心数据：角色、单点登录开关状态、活跃会话列表、最近 20 条审计日志 |
+| `/api/admin/security/toggle-single-session` | POST | 是 | 开启/关闭单终端登录限制（开启后立即踢出其他会话） |
+| `/api/admin/security/logout-others` | POST | 是 | 强制注销除当前终端外的所有活跃会话 |
+| `/api/admin/security/logs/export` | GET | 是 | 导出完整审计日志为 CSV 文件（带 UTF-8 BOM） |
+| `/api/profile` | GET | — | 作者公开资料（display_name、bio、avatar_url、tags） |
+| `/api/track/view` | POST | — | 记录文章页面浏览（匿名，基于指纹去重） |
+| `/api/track/reading` | POST | — | 记录阅读时长（基于 Beacon API 保证页面关闭时发送） |
+| `/sitemap.xml` | GET | — | SEO 站点地图（自动生成已发布文章的 URL 列表，包含首页和文章页） |
 
 ### 数据库表
 
 | 表名 | 说明 |
 |------|------|
 | `users` | 用户：username, password_hash, display_name, bio, avatar_url, last_active_at |
-| `articles` | 文章：title, slug, content_md, content_html, excerpt, cover_image, status, reading_time, search_vector (tsvector), published_at |
+| `articles` | 文章：title, slug, content_md, content_html, excerpt, cover_image, status (draft/published), reading_time, search_vector (tsvector, GIN 索引), published_at |
 | `tags` | 标签：name, slug |
 | `article_tags` | 文章-标签多对多关联 |
 | `user_tags` | 用户-标签关联 |
-| `likes` | 点赞：article_id, fingerprint (唯一约束) |
+| `likes` | 点赞：article_id, fingerprint (唯一约束，fingerprint 支持最多 512 字符) |
 | `media` | 媒体文件：filename, original_name, mime_type, size |
-| `site_settings` | 站点设置键值对 |
-| `carousel_images` | 轮播图：article_id, image_url, sort_order, is_default |
-| `page_views` | 页面浏览：article_id, fingerprint, visited_at |
-| `reading_sessions` | 阅读会话：article_id, fingerprint, duration_seconds |
-| `security_sessions`| 活跃在线会话：id, user_id, device, browser, ip, location, last_active_at, token |
+| `site_settings` | 站点设置键值对（含 background_image 等） |
+| `carousel_images` | 轮播图：article_id (可为空表示全局默认), image_url (支持 __DEFAULT_GRADIENT_N__ 虚拟渐变), sort_order, is_default |
+| `page_views` | 页面浏览：article_id, fingerprint (512), visited_at |
+| `reading_sessions` | 阅读会话：article_id, fingerprint (512), duration_seconds |
+| `security_sessions` | 活跃在线会话：id, user_id, device, browser, ip, location, last_active_at, token |
 | `security_logs` | 安全与操作审计日志：id, user_id, event, status, created_at |
-| `login_lockouts` | 登录封禁限制记录：id, ip, fingerprint, attempt_count, lockout_count, locked_until, updated_at |
-| `captchas` |  一次性验证码防刷：id, code, expires_at |
+| `login_lockouts` | 登录封禁记录：ip, fingerprint, attempt_count, lockout_count, locked_until, updated_at（唯一索引 ip+fingerprint） |
+| `captchas` | 一次性验证码：id (由客户端 cid 标识), code, expires_at |
 
 ---
 
@@ -170,11 +175,11 @@ packages/web/
     ├── index.css               # Tailwind 指令 + 全局样式
     │
     ├── lib/
-    │   └── api.ts              # fetch 封装：api.* (公开) + adminApi.* (带 JWT 验证)
+    │   └── api.ts              # fetch 封装：api.* (公开) + adminApi.* (带 JWT 认证)
     │
     ├── hooks/
     │   ├── useAuth.tsx         # 核心认证：login/logout/token 续签管理、AuthGuard 路由守卫
-    │   ├── useTheme.tsx        # 独立的主题亮/暗切换（支持公共前台与后台面板分别独立设定缓存）
+    │   ├── useTheme.tsx        # 独立的主题亮/暗切换（支持公共前台与后台面板分别独立缓存）
     │   └── useBackground.tsx   # 全局动态背景图逻辑
     │
     ├── pages/
@@ -203,7 +208,7 @@ packages/web/
         ├── BentoGrid.tsx       # Grid 容器
         ├── GlassCard.tsx       # 复用玻璃态卡片
         ├── ImageCarousel.tsx   # 头图轮播
-        ├── LikeButton.tsx      # 心形点赞按钮
+        ├── LikeButton.tsx      # 心形点赞按钮（自动获取设备指纹并查询点赞状态）
         ├── TagCloud.tsx        # 标签云（支持多于 6 个标签弹框查看全部列表）
         ├── ThemeToggle.tsx     # 亮暗模式切换
         ├── Icons.tsx           # SVG 图标组件
@@ -252,7 +257,7 @@ packages/web/
 | `bun run dev` | server | 开发模式启动后端（watch 模式） |
 | `bun start` | server | 生产模式启动后端 |
 | `bun run db:migrate` | server | 执行数据库统一迁移脚本（所有表一键迁移） |
-| `bun run dev` | web | 启动前端 Vite 本地开发服务器 (带有后端 API 反向代理) |
+| `bun run dev` | web | 启动前端 Vite 本地开发服务器（带有后端 API 反向代理） |
 | `bun run build` | web | 前端代码生产构建（TypeScript 编译 + 静态混淆压缩） |
 | `bun run preview` | web | 预览生产打包静态资源 |
 
