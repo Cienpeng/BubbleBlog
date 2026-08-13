@@ -62,7 +62,7 @@ function validateRuntimeConfiguration(): void {
 validateRuntimeConfiguration();
 
 const SECURITY_HEADERS: Record<string, string> = {
-  'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; frame-ancestors 'none'",
+  'Content-Security-Policy': "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https:; font-src 'self' data:; connect-src 'self' https://cloudflareinsights.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-src 'none'; frame-ancestors 'none'",
   'X-Content-Type-Options': 'nosniff',
   'X-Frame-Options': 'DENY',
   'Referrer-Policy': 'strict-origin-when-cross-origin',
@@ -110,7 +110,7 @@ Bun.serve({
     try {
       // Route matching
       if (url.pathname.startsWith('/api/auth/')) {
-        return addSecurityHeaders(req, await handleAuth(req, server, server));
+        return addSecurityHeaders(req, await handleAuth(req, server));
       }
       if (url.pathname.startsWith('/api/settings')) {
         return addSecurityHeaders(req, await handleSettings(req));

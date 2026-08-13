@@ -100,27 +100,6 @@ export async function getLatestArticlesReadingStats(limit: number = 3): Promise<
   return rows as unknown as ArticleReadingStats[];
 }
 
-export async function getLatestArticlesReadingStats(limit: number = 3): Promise<ArticleReadingStats[]> {
-  const rows = await sql`
-    SELECT
-      a.id AS article_id,
-      a.title,
-      a.slug,
-      COALESCE(a.reading_time, 1) AS estimated_minutes,
-      COALESCE(AVG(rs.duration_seconds), 0) AS actual_avg_seconds,
-      COALESCE(AVG(rs.duration_seconds) / 60.0, 0) AS actual_avg_minutes,
-      COUNT(rs.id)::int AS session_count,
-      (SELECT COUNT(*)::int FROM likes l WHERE l.article_id = a.id) AS likes_count
-    FROM articles a
-    LEFT JOIN reading_sessions rs ON rs.article_id = a.id
-    WHERE a.status = 'published'
-    GROUP BY a.id, a.title, a.slug, a.reading_time
-    ORDER BY a.published_at DESC NULLS LAST, a.id DESC
-    LIMIT ${limit}
-  `;
-  return rows as unknown as ArticleReadingStats[];
-}
-
 export async function getArticleReadingStats(articleId: number): Promise<ArticleReadingStats | null> {
   const rows = await sql`
     SELECT
