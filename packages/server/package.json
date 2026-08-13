@@ -6,8 +6,7 @@
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
     "db:migrate": "bun src/db/migrate.ts",
-    "db:migrate-security": "bun src/db/migrate-security.ts",
-    "db:migrate-stats": "bun src/db/migrate-stats.ts"
+    "admin:setup": "bun src/setup-admin.ts"
   },
   "dependencies": {
     "@bubbleblog/shared": "workspace:*",
@@ -19,6 +18,7 @@
     "postgres": "^3.4.0"
   },
   "devDependencies": {
-    "@types/markdown-it": "^14.0.0"
+    "@types/markdown-it": "^14.0.0",
+    "bun-types": "^1.3.14"
   }
 }

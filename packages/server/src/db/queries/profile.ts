@@ -28,7 +28,13 @@ export async function getUserProfile(userId: number): Promise<UserProfile | null
     ORDER BY t.name`;
 
   return {
-    ...user,
+    id: Number(user.id),
+    username: String(user.username),
+    display_name: user.display_name == null ? null : String(user.display_name),
+    bio: user.bio == null ? null : String(user.bio),
+    avatar_url: user.avatar_url == null ? null : String(user.avatar_url),
+    last_active_at: String(user.last_active_at),
+    created_at: String(user.created_at),
     tags: tags.map(t => ({ id: t.id, name: t.name, slug: t.slug })),
   };
 }

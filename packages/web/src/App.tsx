@@ -9,18 +9,21 @@ import ReadingProgress from './components/ReadingProgress';
 import Footer from './components/Footer';
 import SearchModal from './components/SearchModal';
 import AdminLayout from './components/admin/AdminLayout';
+import RouteWarmup from './components/RouteWarmup';
+import { routeModules } from './routes/routeModules';
 
-const HomePage = lazy(() => import('./pages/HomePage'));
-const ArticlePage = lazy(() => import('./pages/ArticlePage'));
-const SearchPage = lazy(() => import('./pages/SearchPage'));
-const TagPage = lazy(() => import('./pages/TagPage'));
-const LoginPage = lazy(() => import('./pages/LoginPage'));
-const Dashboard = lazy(() => import('./pages/admin/Dashboard'));
-const ArticleEditor = lazy(() => import('./pages/admin/ArticleEditor'));
-const Appearance = lazy(() => import('./pages/admin/Appearance'));
-const Stats = lazy(() => import('./pages/admin/Stats'));
-const Profile = lazy(() => import('./pages/admin/Profile'));
-const Security = lazy(() => import('./pages/admin/Security'));
+const HomePage = lazy(routeModules.home);
+const ArticlePage = lazy(routeModules.article);
+const SearchPage = lazy(routeModules.search);
+const TagPage = lazy(routeModules.tag);
+const LoginPage = lazy(routeModules.login);
+const Dashboard = lazy(routeModules.dashboard);
+const ArticleEditor = lazy(routeModules.articleEditor);
+const Appearance = lazy(routeModules.appearance);
+const Stats = lazy(routeModules.stats);
+const ArticleStats = lazy(routeModules.articleStats);
+const Profile = lazy(routeModules.profile);
+const Security = lazy(routeModules.security);
 
 function PublicLayout() {
   const [searchOpen, setSearchOpen] = useState(false);
@@ -60,6 +63,7 @@ export default function App() {
     <ThemeProvider>
       <BackgroundProvider>
         <AuthProvider>
+          <RouteWarmup />
           <Suspense fallback={<LoadingFallback />}>
             <Routes>
               {/* Admin routes */}
@@ -75,6 +79,7 @@ export default function App() {
                 <Route path="articles/new" element={<ArticleEditor />} />
                 <Route path="articles/:id/edit" element={<ArticleEditor />} />
                 <Route path="stats" element={<Stats />} />
+                <Route path="stats/articles" element={<ArticleStats />} />
                 <Route path="profile" element={<Profile />} />
                 <Route path="security" element={<Security />} />
                 <Route path="appearance" element={<Appearance />} />

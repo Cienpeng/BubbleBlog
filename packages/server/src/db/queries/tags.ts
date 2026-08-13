@@ -12,7 +12,10 @@ export async function getAllTags(): Promise<Tag[]> {
 }
 
 export async function getOrCreateTags(tagNames: string[]): Promise<Tag[]> {
-  const trimmed = tagNames.map(n => n.trim()).filter(Boolean);
+  const trimmed = tagNames
+    .slice(0, 20)
+    .map(n => n.trim().slice(0, 50))
+    .filter(Boolean);
   if (trimmed.length === 0) return [];
 
   // Generate slugs
@@ -33,7 +36,7 @@ export async function getOrCreateTags(tagNames: string[]): Promise<Tag[]> {
 
   // Fetch all tags (existing + newly created)
   const rows = await sql`SELECT id, name, slug FROM tags WHERE slug = ANY(${slugs})`;
-  return rows as Tag[];
+  return rows as unknown as Tag[];
 }
 
 export async function setArticleTags(articleId: number, tagIds: number[]): Promise<void> {

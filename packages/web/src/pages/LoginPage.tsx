@@ -19,7 +19,7 @@ export default function LoginPage() {
   const { login, isLoggedIn } = useAuth();
 
   const refreshCaptcha = useCallback(() => {
-    const newCid = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    const newCid = crypto.randomUUID();
     setCaptchaCid(newCid);
     setCaptchaValue('');
     setCaptchaUrl(`/api/auth/captcha?cid=${newCid}&t=${Date.now()}`);
@@ -43,7 +43,7 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    const result = await login(password, captchaCid, captchaValue, getFingerprint());
+    const result = await login(password, captchaCid, captchaValue);
     if (result.success) {
       navigate('/admin');
     } else {

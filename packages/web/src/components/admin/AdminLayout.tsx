@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { IconBubble, IconHome } from '@/components/Icons';
 import CommandPalette from './CommandPalette';
 import ThemeToggle from '@/components/ThemeToggle';
+import { moduleForPath, preloadModule } from '@/routes/routeModules';
 
 
 const TABS = [
@@ -44,6 +45,9 @@ export default function AdminLayout() {
                   <button
                     key={tab.path}
                     onClick={() => navigate(tab.path)}
+                    onMouseEnter={() => preloadModule(moduleForPath(tab.path))}
+                    onFocus={() => preloadModule(moduleForPath(tab.path))}
+                    onTouchStart={() => preloadModule(moduleForPath(tab.path))}
                     className={`px-3 py-1.5 rounded-xl text-sm font-medium transition-colors ${
                       isActive
                         ? 'bg-brand/10 dark:bg-brand/20 text-brand'

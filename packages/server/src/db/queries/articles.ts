@@ -1,5 +1,6 @@
 import sql from '../connection';
 import type { Article, ArticleListItem, ArticleWithTags, CreateArticleInput, PaginatedResponse } from '@bubbleblog/shared';
+import { renderMarkdown } from '../../markdown/renderer';
 
 export async function getPublishedArticles(
   page: number = 1,
@@ -82,27 +83,26 @@ export async function getArticleBySlug(slug: string): Promise<ArticleWithTags | 
 
   const article = rows[0];
 
-  const tagRows = await sql`
-    SELECT t.id, t.name, t.slug FROM tags t
-    JOIN article_tags at2 ON t.id = at2.tag_id
-    WHERE at2.article_id = ${article.id}`;
-
-  // Get prev/next slugs
-  const prevRow = await sql`
-    SELECT slug FROM articles
-    WHERE status = 'published' AND published_at < ${article.published_at}
-    ORDER BY published_at DESC LIMIT 1`;
-  const nextRow = await sql`
-    SELECT slug FROM articles
-    WHERE status = 'published' AND published_at > ${article.published_at}
-    ORDER BY published_at ASC LIMIT 1`;
+  const [tagRows, prevRow, nextRow] = await Promise.all([
+    sql`SELECT t.id, t.name, t.slug FROM tags t
+        JOIN article_tags at2 ON t.id = at2.tag_id
+        WHERE at2.article_id = ${article.id}`,
+    sql`SELECT slug FROM articles
+        WHERE status = 'published' AND published_at < ${article.published_at}
+        ORDER BY published_at DESC LIMIT 1`,
+    sql`SELECT slug FROM articles
+        WHERE status = 'published' AND published_at > ${article.published_at}
+        ORDER BY published_at ASC LIMIT 1`,
+  ]);
 
   return {
     id: article.id,
     title: article.title,
     slug: article.slug,
     content_md: article.content_md,
-    content_html: article.content_html,
+    // Re-render on read so legacy rows created before raw HTML was disabled
+    // cannot serve previously stored active content.
+    content_html: renderMarkdown(article.content_md).html,
     excerpt: article.excerpt,
     cover_image: article.cover_image,
     status: article.status,
@@ -198,13 +198,16 @@ export async function getArticleById(id: number): Promise<ArticleWithTags | null
 
   return {
     ...article,
+    content_html: renderMarkdown(article.content_md).html,
     tags: tagRows.map(t => ({ id: t.id, name: t.name, slug: t.slug })),
   } as ArticleWithTags;
 }
 
 export async function getAllArticles(): Promise<Article[]> {
   const articles = await sql`
-    SELECT a.*, COUNT(l.id)::int as likes_count
+    SELECT a.id, a.title, a.slug, a.excerpt, a.cover_image, a.status,
+           a.reading_time, a.published_at, a.created_at, a.updated_at,
+           COUNT(l.id)::int as likes_count
     FROM articles a
     LEFT JOIN likes l ON a.id = l.article_id
     GROUP BY a.id

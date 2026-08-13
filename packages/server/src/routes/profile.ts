@@ -5,11 +5,16 @@ import { getUserProfile, updateUserProfile, setUserTags, updatePassword } from '
 import { getOrCreateTags } from '../db/queries/tags';
 import { deleteLocalMedia } from './media';
 import { securityService } from '../services/security';
+import { readJson } from '../middleware/body';
+import { getSessionToken } from '../services/session-token';
+import { sessionCookie } from '../services/session-policy';
 
-async function getUserId(req: Request): Promise<{ userId: number; username: string } | null> {
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) return null;
-  return verifyToken(authHeader.slice(7));
+async function getUserId(req: Request): Promise<{ userId: number; username: string }> {
+  const token = getSessionToken(req);
+  if (!token) throw new Error('Authenticated session token is missing');
+  const payload = await verifyToken(token);
+  if (!payload) throw new Error('Authenticated session token is invalid');
+  return payload;
 }
 
 export async function handleProfile(req: Request, server?: any): Promise<Response> {
@@ -51,7 +56,7 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
     }
 
     return Response.json(
-      { success: true, data: profile, newToken: auth.newToken },
+      { success: true, data: profile },
       { headers: corsHeaders() }
     );
   }
@@ -62,7 +67,16 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
     if (!auth.authorized) return auth.response!;
 
     const payload = await getUserId(req);
-    const body = await req.json();
+    const body = await readJson(req, 64 * 1024);
+
+    if (
+      (body.display_name !== undefined && (typeof body.display_name !== 'string' || body.display_name.length > 100)) ||
+      (body.bio !== undefined && (typeof body.bio !== 'string' || body.bio.length > 20_000)) ||
+      (body.avatar_url !== undefined && (typeof body.avatar_url !== 'string' || body.avatar_url.length > 500)) ||
+      (body.tags !== undefined && (!Array.isArray(body.tags) || body.tags.length > 20))
+    ) {
+      return Response.json({ success: false, error: 'Invalid profile payload' }, { status: 400, headers: corsHeaders() });
+    }
 
     // Clean up old avatar if it's being changed
     const currentProfile = await getUserProfile(payload.userId);
@@ -97,7 +111,7 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
     securityService.recordActivity(payload.userId, '修改个人设置资料及外部链接配置', 'success');
 
     return Response.json(
-      { success: true, data: updated, newToken: auth.newToken },
+      { success: true, data: updated },
       { headers: corsHeaders() }
     );
   }
@@ -108,7 +122,7 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
     if (!auth.authorized) return auth.response!;
 
     const payload = await getUserId(req);
-    const body = await req.json();
+    const body = await readJson(req, 8 * 1024);
 
     const { current_password, new_password } = body;
     if (!current_password || !new_password) {
@@ -117,9 +131,9 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
         { status: 400, headers: corsHeaders() }
       );
     }
-    if (new_password.length < 8) {
+    if (typeof current_password !== 'string' || typeof new_password !== 'string' || new_password.length < 12 || new_password.length > 128) {
       return Response.json(
-        { success: false, error: '新密码至少 8 位' },
+        { success: false, error: '新密码必须为 12 至 128 位' },
         { status: 400, headers: corsHeaders() }
       );
     }
@@ -144,13 +158,14 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
 
     const newHash = await Bun.password.hash(new_password, { algorithm: 'bcrypt', cost: 12 });
     await updatePassword(payload.userId, newHash);
+    await securityService.logoutAll(payload.userId);
 
     // Record audit log
     securityService.recordActivity(payload.userId, '重置修改管理员登录密码', 'success');
 
     return Response.json(
-      { success: true, data: { message: '密码已更新' }, newToken: auth.newToken },
-      { headers: corsHeaders() }
+      { success: true, data: { message: '密码已更新，请重新登录' } },
+      { headers: { ...corsHeaders(), 'Set-Cookie': sessionCookie('', 0) } }
     );
   }
 
@@ -160,19 +175,14 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
     if (!auth.authorized) return auth.response!;
 
     const payload = await getUserId(req);
-    if (!payload) {
-      return Response.json(
-        { success: false, error: '用户未登录' },
-        { status: 404, headers: corsHeaders() }
-      );
-    }
-
-    const logs = await securityService.getLogs(payload.userId);
+    const logs = await securityService.getLogs(payload.userId, 10_000);
     const escapeCSV = (str: string) => {
-      if (/[",\n\r]/.test(str)) {
-        return `"${str.replace(/"/g, '""')}"`;
+      // Prevent spreadsheet formula execution when a CSV is opened in Excel.
+      const safe = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+      if (/[",\n\r]/.test(safe)) {
+        return `"${safe.replace(/"/g, '""')}"`;
       }
-      return str;
+      return safe;
     };
 
     const header = '时间,操作事件,状态\n';
@@ -199,37 +209,8 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
     if (!auth.authorized) return auth.response!;
 
     const payload = await getUserId(req);
-    if (!payload) {
-      return Response.json(
-        { success: false, error: '用户未登录' },
-        { status: 404, headers: corsHeaders() }
-      );
-    }
-
-    const currentToken = req.headers.get('Authorization')?.slice(7) || '';
-
-    // Auto-register session if not exists
+    const currentToken = getSessionToken(req) || '';
     const sessions = await securityService.getSessions(payload.userId, currentToken);
-    if (sessions.length === 0) {
-      const ua = req.headers.get('user-agent') || 'Unknown User-Agent';
-      const forwarded = req.headers.get('x-forwarded-for');
-      let ip = '127.0.0.1';
-      if (forwarded) ip = forwarded.split(',')[0].trim();
-      else if (req.headers.get('x-real-ip')) ip = req.headers.get('x-real-ip')!;
-      else {
-        try {
-          const socketIp = server?.requestIP?.(req);
-          if (socketIp?.address) ip = socketIp.address;
-        } catch (e) {}
-      }
-
-      await securityService.addSession(payload.userId, currentToken, ua, ip);
-      await securityService.recordActivity(payload.userId, '安全中心控制面板访问初始化', 'success');
-    } else {
-      await securityService.updateSessionActivity(currentToken);
-    }
-
-    const updatedSessions = await securityService.getSessions(payload.userId, currentToken);
     const logs = await securityService.getLogs(payload.userId, 20);
 
     // Get single session setting
@@ -246,10 +227,9 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
         data: {
           role: '系统超级管理员 (Owner)',
           singleSessionEnabled,
-          sessions: updatedSessions,
+          sessions,
           logs: logs,
         },
-        newToken: auth.newToken,
       },
       { headers: corsHeaders() }
     );
@@ -261,14 +241,7 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
     if (!auth.authorized) return auth.response!;
 
     const payload = await getUserId(req);
-    if (!payload) {
-      return Response.json(
-        { success: false, error: '用户未登录' },
-        { status: 404, headers: corsHeaders() }
-      );
-    }
-
-    const body = await req.json();
+    const body = await readJson(req, 4 * 1024);
     const enabled = body.enabled === true;
 
     const { setSetting } = require('../db/queries/settings');
@@ -280,12 +253,12 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
 
     // If enabled, logout others immediately
     if (enabled) {
-      const currentToken = req.headers.get('Authorization')?.slice(7) || '';
+      const currentToken = getSessionToken(req) || '';
       await securityService.logoutOthers(payload.userId, currentToken);
     }
 
     return Response.json(
-      { success: true, data: { enabled }, newToken: auth.newToken },
+      { success: true, data: { enabled } },
       { headers: corsHeaders() }
     );
   }
@@ -296,19 +269,12 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
     if (!auth.authorized) return auth.response!;
 
     const payload = await getUserId(req);
-    if (!payload) {
-      return Response.json(
-        { success: false, error: '用户未登录' },
-        { status: 404, headers: corsHeaders() }
-      );
-    }
-
-    const currentToken = req.headers.get('Authorization')?.slice(7) || '';
+    const currentToken = getSessionToken(req) || '';
     await securityService.logoutOthers(payload.userId, currentToken);
     await securityService.recordActivity(payload.userId, '清除注销其他所有设备活跃登录会话', 'success');
 
     return Response.json(
-      { success: true, data: { message: '已成功清理并注销其他所有设备的活跃会话' }, newToken: auth.newToken },
+      { success: true, data: { message: '已成功清理并注销其他所有设备的活跃会话' } },
       { headers: corsHeaders() }
     );
   }

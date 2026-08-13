@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth';
 import sql from '../db/connection';
 import { join } from 'path';
 import { unlink } from 'fs/promises';
+import { readFormData } from '../middleware/body';
 
 const UPLOAD_DIR = process.env.UPLOAD_DIR || './uploads';
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
@@ -12,10 +13,21 @@ const MAGIC_BYTES: Record<string, number[]> = {
   'image/webp': [0x52, 0x49, 0x46, 0x46],
   'image/gif': [0x47, 0x49, 0x46, 0x38],
 };
+const EXTENSION_BY_MIME: Record<string, string> = {
+  'image/jpeg': 'jpg',
+  'image/png': 'png',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
 
 function validateMagicBytes(bytes: Uint8Array): string | null {
   for (const [mime, magic] of Object.entries(MAGIC_BYTES)) {
-    if (magic.every((b, i) => bytes[i] === b)) return mime;
+    if (!magic.every((b, i) => bytes[i] === b)) continue;
+    if (mime === 'image/webp') {
+      const webp = String.fromCharCode(...bytes.slice(8, 12));
+      if (webp !== 'WEBP') continue;
+    }
+    return mime;
   }
   return null;
 }
@@ -31,7 +43,7 @@ export async function handleMedia(req: Request): Promise<Response> {
     const auth = await requireAuth(req);
     if (!auth.authorized) return auth.response!;
 
-    const formData = await req.formData();
+    const formData = await readFormData(req, 2 * 1024 * 1024 + 64 * 1024);
     const file = formData.get('file');
     if (!file || !(file instanceof File)) {
       return Response.json({ success: false, error: 'No file provided' }, { status: 400, headers: corsHeaders() });
@@ -47,11 +59,11 @@ export async function handleMedia(req: Request): Promise<Response> {
 
     const buffer = new Uint8Array(await file.arrayBuffer());
     const detectedType = validateMagicBytes(buffer);
-    if (!detectedType) {
+    if (!detectedType || detectedType !== file.type) {
       return Response.json({ success: false, error: 'Invalid file content' }, { status: 400, headers: corsHeaders() });
     }
 
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+    const ext = EXTENSION_BY_MIME[detectedType];
     const filename = `${crypto.randomUUID()}.${ext}`;
     const filepath = join(UPLOAD_DIR, filename);
 
@@ -63,7 +75,7 @@ export async function handleMedia(req: Request): Promise<Response> {
       RETURNING id, filename, original_name, mime_type, size, uploaded_at`;
 
     return Response.json(
-      { success: true, data: rows[0], newToken: auth.newToken },
+      { success: true, data: rows[0] },
       { status: 201, headers: corsHeaders() }
     );
   }
@@ -77,10 +89,27 @@ export async function handleMedia(req: Request): Promise<Response> {
     }
     const filepath = join(UPLOAD_DIR, filename);
     const file = Bun.file(filepath);
-    if (!(await file.exists())) {
+    const rows = await sql`
+      SELECT mime_type FROM media
+      WHERE filename = ${filename}
+      LIMIT 1
+    `;
+    const mimeType = rows.length > 0 && ALLOWED_IMAGE_TYPES.includes(rows[0].mime_type)
+      ? String(rows[0].mime_type)
+      : null;
+    if (!mimeType || !(await file.exists())) {
       return Response.json({ success: false, error: 'File not found' }, { status: 404 });
     }
-    return new Response(file);
+    return new Response(file, {
+      headers: {
+        // Use trusted database metadata instead of the URL extension so legacy
+        // uploads cannot be served as same-origin HTML.
+        'Content-Type': mimeType,
+        'Content-Disposition': `inline; filename="${filename}"`,
+        'Cache-Control': 'public, max-age=31536000, immutable',
+        'X-Content-Type-Options': 'nosniff',
+      },
+    });
   }
 
   return Response.json({ success: false, error: 'Not found' }, { status: 404, headers: corsHeaders() });

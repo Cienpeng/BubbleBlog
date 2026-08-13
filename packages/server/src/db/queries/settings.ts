@@ -14,6 +14,16 @@ export async function getAllSettings(): Promise<Record<string, string>> {
   return settings;
 }
 
+const PUBLIC_SETTING_KEYS = ['background_image'] as const;
+
+export async function getPublicSettings(): Promise<Record<string, string>> {
+  const rows = await sql`
+    SELECT key, value FROM site_settings
+    WHERE key = ANY(${[...PUBLIC_SETTING_KEYS]})
+  `;
+  return Object.fromEntries(rows.map(row => [row.key, row.value]));
+}
+
 export async function setSetting(key: string, value: string): Promise<void> {
   await sql`
     INSERT INTO site_settings (key, value, updated_at)

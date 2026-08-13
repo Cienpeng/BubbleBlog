@@ -102,11 +102,8 @@ export default function Security() {
     if (exporting) return;
     setExporting(true);
     try {
-      const token = localStorage.getItem('token') || '';
       const response = await fetch('/api/admin/security/logs/export', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        credentials: 'same-origin'
       });
       if (!response.ok) {
         throw new Error('导出失败');
@@ -186,7 +183,7 @@ export default function Security() {
 
               <div className="border-t border-black/[0.04] dark:border-white/[0.04] pt-4">
                 <h3 className="text-sm font-semibold text-text-primary dark:text-white">登录会话有效期</h3>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">当前设定为：60 小时无操作过期</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">当前设定为：连续 60 小时无后台活动后过期，使用期间自动续期</p>
               </div>
 
               <div className="border-t border-black/[0.04] dark:border-white/[0.04] pt-4">

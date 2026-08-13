@@ -1,6 +1,5 @@
-// Load .env files (Bun doesn't auto-load .env)
-// Loads ALL found .env files — later ones override earlier ones
-// Priority: CWD/.env < parent/.env < ... < root/.env
+// Load a single project .env for local/direct deployments. Values supplied by
+// systemd or the parent process always win and are never overwritten.
 import { join, dirname } from 'path';
 
 async function loadOneEnv(filePath: string): Promise<boolean> {
@@ -20,58 +19,34 @@ async function loadOneEnv(filePath: string): Promise<boolean> {
         (value.startsWith("'") && value.endsWith("'"))) {
       value = value.slice(1, -1);
     }
-    // Later files override earlier ones (so root .env wins over server/.env)
-    process.env[key] = value;
-    count++;
+    if (process.env[key] === undefined) {
+      process.env[key] = value;
+      count++;
+    }
   }
   console.log(`[env] ✅ Loaded ${count} vars from: ${filePath}`);
   return true;
 }
 
-// Walk UP from CWD to root, collecting all .env files
-// Load from bottom-to-top so root .env overrides nested ones
 async function loadEnv() {
   const cwd = process.cwd();
-  let dir = cwd;
-  const envFiles: string[] = [];
+  const cwdEnv = join(cwd, '.env');
+  let selectedPath = await Bun.file(cwdEnv).exists() ? cwdEnv : '';
 
-  // Collect .env files from CWD up to filesystem root (or 5 levels)
-  for (let i = 0; i < 6; i++) {
-    const envPath = join(dir, '.env');
-    const file = Bun.file(envPath);
-    if (await file.exists()) {
-      envFiles.push(envPath);
-    }
-    const parent = dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
-  }
-
-  console.log(`[env] Searching from CWD: ${cwd}`);
-
-  if (envFiles.length === 0) {
-    // Fallback: try script-relative path
+  if (!selectedPath) {
     try {
       const scriptDir = dirname(new URL(import.meta.url).pathname);
       const cleanDir = scriptDir.match(/^\/[A-Za-z]:/) ? scriptDir.slice(1) : scriptDir;
-      const rootEnv = join(cleanDir, '..', '..', '..', '.env');
-      if (await Bun.file(rootEnv).exists()) {
-        envFiles.push(rootEnv);
-      }
+      const projectEnv = join(cleanDir, '..', '..', '..', '.env');
+      if (await Bun.file(projectEnv).exists()) selectedPath = projectEnv;
     } catch {}
   }
 
-  if (envFiles.length === 0) {
+  if (!selectedPath) {
     console.warn('[env] ❌ No .env file found, using defaults');
     return;
   }
-
-  // Reverse so root-level loads LAST (highest priority)
-  envFiles.reverse();
-
-  for (const p of envFiles) {
-    await loadOneEnv(p);
-  }
+  await loadOneEnv(selectedPath);
 }
 
 await loadEnv();

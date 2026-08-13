@@ -27,13 +27,6 @@ export default defineConfig({
             if (id.includes('react') || id.includes('scheduler')) {
               return 'react-vendor';
             }
-            if (id.includes('katex')) {
-              return 'katex-vendor';
-            }
-            if (id.includes('highlight.js')) {
-              return 'highlight-vendor';
-            }
-            return 'vendor';
           }
         }
       }

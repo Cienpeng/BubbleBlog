@@ -1,4 +1,5 @@
 import sql from '../db/connection';
+import { hashSessionToken } from './token-hash';
 
 export interface Session {
   id: string;
@@ -7,7 +8,6 @@ export interface Session {
   ip: string;
   location: string;
   lastActive: string;
-  token: string;
   userId: number;
   isCurrent?: boolean;
 }
@@ -57,47 +57,38 @@ class SecurityService {
   public async addSession(userId: number, token: string, userAgent: string, ip: string) {
     const { device, browser } = this.parseUA(userAgent);
     const location = this.getIpLocation(ip);
-    const id = Math.random().toString(36).substring(2, 11);
+    const id = crypto.randomUUID();
+    const tokenHash = await hashSessionToken(token);
 
-    try {
-      // Remove any existing session with this token first
-      await sql`
-        DELETE FROM security_sessions
-        WHERE token = ${token}
-      `;
-
-      // Insert new session
-      await sql`
-        INSERT INTO security_sessions (id, user_id, device, browser, ip, location, token, last_active_at)
-        VALUES (${id}, ${userId}, ${device}, ${browser}, ${ip}, ${location}, ${token}, NOW())
-      `;
-    } catch (err) {
-      console.error('Failed to add security session to database:', err);
-    }
-  }
-
-  public async updateSessionActivity(token: string) {
-    try {
-      await sql`
-        UPDATE security_sessions
-        SET last_active_at = NOW()
-        WHERE token = ${token}
-      `;
-    } catch (err) {
-      console.error('Failed to update security session activity in database:', err);
-    }
+    await sql`
+      INSERT INTO security_sessions (id, user_id, device, browser, ip, location, token_hash, last_active_at)
+      VALUES (${id}, ${userId}, ${device}, ${browser}, ${ip}, ${location}, ${tokenHash}, NOW())
+      ON CONFLICT (token_hash) DO UPDATE SET
+        user_id = EXCLUDED.user_id,
+        device = EXCLUDED.device,
+        browser = EXCLUDED.browser,
+        ip = EXCLUDED.ip,
+        location = EXCLUDED.location,
+        last_active_at = NOW()
+    `;
   }
 
   public async getSessions(userId: number, currentToken: string): Promise<Session[]> {
+    const currentTokenHash = await hashSessionToken(currentToken);
     try {
       const rows = await sql`
-        SELECT id, device, browser, ip, location, token, last_active_at
+        SELECT id, device, browser, ip, location, token_hash,
+               previous_token_hash, previous_token_valid_until, last_active_at
         FROM security_sessions
         WHERE user_id = ${userId}
         ORDER BY last_active_at DESC
       `;
       return rows.map(r => {
-        const isCurrent = r.token === currentToken;
+        const previousTokenIsCurrent =
+          r.previous_token_hash === currentTokenHash &&
+          r.previous_token_valid_until &&
+          new Date(r.previous_token_valid_until).getTime() > Date.now();
+        const isCurrent = r.token_hash === currentTokenHash || previousTokenIsCurrent;
         return {
           id: r.id,
           device: r.device,
@@ -105,7 +96,6 @@ class SecurityService {
           ip: r.ip,
           location: r.location,
           lastActive: isCurrent ? '当前活跃' : '最近活跃',
-          token: r.token,
           userId: userId,
           isCurrent,
         };
@@ -117,14 +107,64 @@ class SecurityService {
   }
 
   public async logoutOthers(userId: number, currentToken: string) {
+    const currentTokenHash = await hashSessionToken(currentToken);
     try {
-      await sql`
-        DELETE FROM security_sessions
-        WHERE user_id = ${userId} AND token != ${currentToken}
+      const currentRows = await sql`
+        SELECT id
+        FROM security_sessions
+        WHERE user_id = ${userId}
+          AND (
+            token_hash = ${currentTokenHash}
+            OR (
+              previous_token_hash = ${currentTokenHash}
+              AND previous_token_valid_until > NOW()
+            )
+          )
+        LIMIT 1
       `;
+      if (currentRows.length > 0) {
+        await sql`
+          DELETE FROM security_sessions
+          WHERE user_id = ${userId} AND id != ${currentRows[0].id}
+        `;
+      } else {
+        // A successful new login calls this before its new session row exists.
+        await sql`DELETE FROM security_sessions WHERE user_id = ${userId}`;
+      }
     } catch (err) {
       console.error('Failed to delete other sessions from database:', err);
     }
+  }
+
+  public async logoutAll(userId: number) {
+    await sql`DELETE FROM security_sessions WHERE user_id = ${userId}`;
+  }
+
+  public async logoutCurrent(token: string) {
+    const tokenHash = await hashSessionToken(token);
+    await sql`
+      DELETE FROM security_sessions
+      WHERE token_hash = ${tokenHash}
+         OR (
+           previous_token_hash = ${tokenHash}
+           AND previous_token_valid_until > NOW()
+         )
+    `;
+  }
+
+  public async cleanupExpiredData(): Promise<void> {
+    await sql`DELETE FROM security_sessions WHERE last_active_at < NOW() - INTERVAL '60 hours'`;
+    await sql`
+      UPDATE security_sessions
+      SET previous_token_hash = NULL, previous_token_valid_until = NULL
+      WHERE previous_token_valid_until <= NOW()
+    `;
+    await sql`
+      DELETE FROM login_lockouts
+      WHERE updated_at < NOW() - INTERVAL '1 day'
+        AND (locked_until IS NULL OR locked_until < NOW())
+    `;
+    await sql`DELETE FROM security_logs WHERE created_at < NOW() - INTERVAL '180 days'`;
   }
 
   public async recordActivity(userId: number, event: string, status: 'success' | 'warn' = 'success') {
@@ -154,28 +194,6 @@ class SecurityService {
             WHERE user_id = ${userId}
             ORDER BY created_at DESC
           `;
-
-      // If no logs exist yet, insert seed bootstrap logs so the list isn't empty
-      if (rows.length === 0) {
-        const now = new Date();
-        const pad = (n: number) => String(n).padStart(2, '0');
-        const getFormattedTime = (date: Date) => {
-          return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
-        };
-
-        const seedTime1 = new Date(now.getTime() - 24 * 3600 * 1000); // 1 day ago
-        const seedTime2 = new Date(now.getTime() - 2 * 3600 * 1000);  // 2 hours ago
-
-        await sql`
-          INSERT INTO security_logs (user_id, event, status, created_at)
-          VALUES 
-            (${userId}, '系统数据库初始化及主键约束迁移完成', 'success', ${seedTime1.toISOString()}),
-            (${userId}, '系统全局外观背景及轮播图缓存预热成功', 'success', ${seedTime2.toISOString()})
-        `;
-
-        // Re-query
-        return this.getLogs(userId, limit);
-      }
 
       const pad = (n: number) => String(n).padStart(2, '0');
       return rows.map(r => {

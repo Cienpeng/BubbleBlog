@@ -132,10 +132,9 @@ export default function Dashboard() {
     formData.append('file', file);
 
     try {
-      const token = localStorage.getItem('token');
       const res = await fetch('/api/articles/upload', {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'same-origin',
         body: formData,
       });
       const json = await res.json();

@@ -1,8 +1,12 @@
 export function generateCaptchaSVG(): { text: string; svg: string } {
   const chars = '23456789abcdefghkmnpqrstuvwxyzABCDEFGHKMNPQRSTUVWXYZ';
+  const random = new Uint32Array(256);
+  crypto.getRandomValues(random);
+  let randomIndex = 0;
+  const next = () => random[randomIndex++ % random.length] / 0x1_0000_0000;
   let text = '';
   for (let i = 0; i < 4; i++) {
-    text += chars[Math.floor(Math.random() * chars.length)];
+    text += chars[Math.floor(next() * chars.length)];
   }
 
   const width = 120;
@@ -14,31 +18,31 @@ export function generateCaptchaSVG(): { text: string; svg: string } {
 
   // Draw some noise lines
   for (let i = 0; i < 4; i++) {
-    const x1 = Math.random() * width;
-    const y1 = Math.random() * height;
-    const x2 = Math.random() * width;
-    const y2 = Math.random() * height;
-    const stroke = `rgb(${Math.floor(Math.random()*150)}, ${Math.floor(Math.random()*150)}, ${Math.floor(Math.random()*150)})`;
+    const x1 = next() * width;
+    const y1 = next() * height;
+    const x2 = next() * width;
+    const y2 = next() * height;
+    const stroke = `rgb(${Math.floor(next()*150)}, ${Math.floor(next()*150)}, ${Math.floor(next()*150)})`;
     svg += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${stroke}" stroke-width="1.5" opacity="0.4"/>`;
   }
 
   // Draw noise dots
   for (let i = 0; i < 35; i++) {
-    const cx = Math.random() * width;
-    const cy = Math.random() * height;
-    const r = Math.random() * 1.5;
-    const fill = `rgb(${Math.floor(Math.random()*150)}, ${Math.floor(Math.random()*150)}, ${Math.floor(Math.random()*150)})`;
+    const cx = next() * width;
+    const cy = next() * height;
+    const r = next() * 1.5;
+    const fill = `rgb(${Math.floor(next()*150)}, ${Math.floor(next()*150)}, ${Math.floor(next()*150)})`;
     svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" opacity="0.3"/>`;
   }
 
   // Draw letters
   for (let i = 0; i < text.length; i++) {
     const char = text[i];
-    const x = 15 + i * 26 + (Math.random() * 6 - 3);
-    const y = 28 + (Math.random() * 6 - 3);
-    const angle = Math.random() * 30 - 15; // rotate angle between -15 and 15 degrees
-    const fontSize = 22 + Math.random() * 4;
-    const fill = `rgb(${Math.floor(Math.random()*100)}, ${Math.floor(Math.random()*100)}, ${Math.floor(Math.random()*100)})`;
+    const x = 15 + i * 26 + (next() * 6 - 3);
+    const y = 28 + (next() * 6 - 3);
+    const angle = next() * 30 - 15;
+    const fontSize = 22 + next() * 4;
+    const fill = `rgb(${Math.floor(next()*100)}, ${Math.floor(next()*100)}, ${Math.floor(next()*100)})`;
     svg += `<text x="${x}" y="${y}" fill="${fill}" font-size="${fontSize}" font-family="monospace" font-weight="bold" transform="rotate(${angle} ${x} ${y})">${char}</text>`;
   }
 

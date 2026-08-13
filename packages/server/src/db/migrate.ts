@@ -150,11 +150,32 @@ CREATE TABLE IF NOT EXISTS security_sessions (
   ip VARCHAR(100) NOT NULL,
   location VARCHAR(255) NOT NULL,
   last_active_at TIMESTAMP DEFAULT NOW(),
-  token TEXT NOT NULL
+  token_hash VARCHAR(64),
+  previous_token_hash VARCHAR(64),
+  previous_token_valid_until TIMESTAMP
 );
 
 CREATE INDEX IF NOT EXISTS idx_security_sessions_user ON security_sessions(user_id);
-CREATE INDEX IF NOT EXISTS idx_security_sessions_token ON security_sessions(token);
+
+-- Migrate away from reusable plaintext bearer tokens. Existing sessions are
+-- deliberately invalidated because hashes cannot safely be reconstructed in SQL.
+ALTER TABLE security_sessions ADD COLUMN IF NOT EXISTS token_hash VARCHAR(64);
+ALTER TABLE security_sessions ADD COLUMN IF NOT EXISTS previous_token_hash VARCHAR(64);
+ALTER TABLE security_sessions ADD COLUMN IF NOT EXISTS previous_token_valid_until TIMESTAMP;
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'security_sessions' AND column_name = 'token'
+  ) THEN
+    DELETE FROM security_sessions;
+    DROP INDEX IF EXISTS idx_security_sessions_token;
+    ALTER TABLE security_sessions DROP COLUMN token;
+  END IF;
+END $$;
+ALTER TABLE security_sessions ALTER COLUMN token_hash SET NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_security_sessions_token_hash ON security_sessions(token_hash);
+CREATE INDEX IF NOT EXISTS idx_security_sessions_previous_token_hash ON security_sessions(previous_token_hash);
 
 -- Create security logs table
 CREATE TABLE IF NOT EXISTS security_logs (
@@ -166,6 +187,7 @@ CREATE TABLE IF NOT EXISTS security_logs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_security_logs_user ON security_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_security_logs_user_created ON security_logs(user_id, created_at DESC);
 
 -- Page views for daily visit tracking
 CREATE TABLE IF NOT EXISTS page_views (
@@ -177,6 +199,12 @@ CREATE TABLE IF NOT EXISTS page_views (
 
 CREATE INDEX IF NOT EXISTS idx_page_views_date ON page_views(visited_at);
 CREATE INDEX IF NOT EXISTS idx_page_views_article ON page_views(article_id);
+CREATE INDEX IF NOT EXISTS idx_page_views_article_date ON page_views(article_id, visited_at);
+-- Never delete historical analytics during an automatic migration. If a
+-- legacy database contains duplicate daily rows, unique-index creation fails
+-- safely so an operator can archive or merge them explicitly.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_page_views_daily_unique
+  ON page_views(article_id, fingerprint, (visited_at::date));
 
 -- Reading sessions for actual reading time tracking
 CREATE TABLE IF NOT EXISTS reading_sessions (
@@ -188,6 +216,9 @@ CREATE TABLE IF NOT EXISTS reading_sessions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_reading_sessions_article ON reading_sessions(article_id);
+CREATE INDEX IF NOT EXISTS idx_reading_sessions_article_date ON reading_sessions(article_id, created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_reading_sessions_daily_unique
+  ON reading_sessions(article_id, fingerprint, (created_at::date));
 
 -- Login lockouts table for limiting failed attempts and tracking blocks
 CREATE TABLE IF NOT EXISTS login_lockouts (
@@ -202,6 +233,7 @@ CREATE TABLE IF NOT EXISTS login_lockouts (
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_login_lockouts_ip_fingerprint ON login_lockouts(ip, fingerprint);
 CREATE INDEX IF NOT EXISTS idx_login_lockouts_locked ON login_lockouts(locked_until);
+CREATE INDEX IF NOT EXISTS idx_login_lockouts_fingerprint ON login_lockouts(fingerprint);
 
 -- Captchas table for validating verification codes
 CREATE TABLE IF NOT EXISTS captchas (
@@ -209,16 +241,25 @@ CREATE TABLE IF NOT EXISTS captchas (
   code VARCHAR(10) NOT NULL,
   expires_at TIMESTAMP NOT NULL
 );
+CREATE INDEX IF NOT EXISTS idx_captchas_expires ON captchas(expires_at);
+
 `;
 
 async function migrate() {
   console.log('Running migrations...');
-  await sql.unsafe(migration);
-  console.log('Migrations complete.');
-  await sql.end();
+  try {
+    // postgres.js connection pools must reserve one connection for the whole
+    // transaction. Do not put literal BEGIN/COMMIT statements in sql.unsafe().
+    await sql.begin(async (transaction) => {
+      await transaction.unsafe(migration);
+    });
+    console.log('Migrations complete.');
+  } finally {
+    await sql.end();
+  }
 }
 
 migrate().catch((err) => {
   console.error('Migration failed:', err);
-  process.exit(1);
+  process.exitCode = 1;
 });

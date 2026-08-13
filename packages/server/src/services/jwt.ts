@@ -1,7 +1,25 @@
-const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-in-production';
-const JWT_EXPIRY_MS = 60 * 60 * 60 * 1000; // 60 hours for the token itself
+import { SESSION_TOKEN_TTL_SECONDS } from './session-policy';
 
-interface TokenPayload {
+let keyPromise: Promise<CryptoKey> | null = null;
+
+function getSigningKey(): Promise<CryptoKey> {
+  if (!keyPromise) {
+    const secret = process.env.JWT_SECRET || '';
+    if (secret.length < 32 || /change|dev-secret|changeme/i.test(secret)) {
+      throw new Error('JWT_SECRET must be a non-placeholder secret of at least 32 characters');
+    }
+    keyPromise = crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(secret),
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign', 'verify']
+    );
+  }
+  return keyPromise;
+}
+
+export interface TokenPayload {
   username: string;
   userId: number;
   iat: number;
@@ -22,7 +40,7 @@ export async function createToken(payload: { username: string; userId: number })
   const tokenPayload: TokenPayload = {
     ...payload,
     iat: now,
-    exp: now + JWT_EXPIRY_MS / 1000,
+    exp: now + SESSION_TOKEN_TTL_SECONDS,
   };
 
   const headerB64 = await base64UrlEncode(JSON.stringify(header));
@@ -31,13 +49,7 @@ export async function createToken(payload: { username: string; userId: number })
 
   // HMAC-SHA256 via Web Crypto (Bun)
   const encoder = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    'raw',
-    encoder.encode(JWT_SECRET),
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
+  const key = await getSigningKey();
   const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(data));
   const sigB64 = btoa(String.fromCharCode(...new Uint8Array(signature)))
     .replace(/=/g, '')
@@ -47,23 +59,19 @@ export async function createToken(payload: { username: string; userId: number })
   return `${data}.${sigB64}`;
 }
 
-export async function verifyToken(token: string): Promise<{ username: string; userId: number } | null> {
+export async function verifyToken(token: string): Promise<TokenPayload | null> {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
 
     const [headerB64, payloadB64, sigB64] = parts;
+    const header = JSON.parse(atob(headerB64.replace(/-/g, '+').replace(/_/g, '/')));
+    if (header?.alg !== 'HS256' || header?.typ !== 'JWT') return null;
     const data = `${headerB64}.${payloadB64}`;
 
     // Verify signature
     const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(JWT_SECRET),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['verify']
-    );
+    const key = await getSigningKey();
 
     const sigBytes = Uint8Array.from(
       atob(sigB64.replace(/-/g, '+').replace(/_/g, '/')),
@@ -78,9 +86,17 @@ export async function verifyToken(token: string): Promise<{ username: string; us
     const payload: TokenPayload = JSON.parse(payloadJson);
 
     // Check expiry
-    if (payload.exp < Math.floor(Date.now() / 1000)) return null;
+    const now = Math.floor(Date.now() / 1000);
+    if (
+      typeof payload.username !== 'string' ||
+      !Number.isInteger(payload.userId) ||
+      !Number.isInteger(payload.iat) ||
+      !Number.isInteger(payload.exp) ||
+      payload.iat > now + 60 ||
+      payload.exp <= now
+    ) return null;
 
-    return { username: payload.username, userId: payload.userId };
+    return payload;
   } catch {
     return null;
   }

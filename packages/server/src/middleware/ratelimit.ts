@@ -1,4 +1,5 @@
 import { corsHeaders } from './cors';
+import { isIP } from 'node:net';
 
 interface RateLimitEntry {
   count: number;
@@ -10,7 +11,18 @@ const stores: Record<string, Map<string, RateLimitEntry>> = {
   global: new Map(),
   login: new Map(),
   like: new Map(),
+  captcha: new Map(),
+  tracking: new Map(),
 };
+const MAX_STORE_ENTRIES = 10_000;
+const clientIPs = new WeakMap<Request, string>();
+
+export function registerClientIP(req: Request, socketIP: string | undefined): void {
+  const directIP = socketIP && isIP(socketIP) ? socketIP : '127.0.0.1';
+  const isLocalProxy = directIP === '127.0.0.1' || directIP === '::1';
+  const forwarded = req.headers.get('X-Forwarded-For')?.split(',')[0]?.trim();
+  clientIPs.set(req, isLocalProxy && forwarded && isIP(forwarded) ? forwarded : directIP);
+}
 
 // Cleanup expired entries every 5 minutes
 setInterval(() => {
@@ -22,13 +34,12 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-function getIP(req: Request): string {
-  const forwarded = req.headers.get('X-Forwarded-For');
-  return forwarded?.split(',')[0]?.trim() || '127.0.0.1';
+export function getIP(req: Request): string {
+  return clientIPs.get(req) || '127.0.0.1';
 }
 
 function checkLimit(
-  storeName: 'global' | 'login' | 'like',
+  storeName: 'global' | 'login' | 'like' | 'captcha' | 'tracking',
   key: string,
   maxRequests: number,
   windowMs: number
@@ -38,6 +49,10 @@ function checkLimit(
   const existing = store.get(key);
 
   if (!existing || now > existing.resetAt) {
+    if (!existing && store.size >= MAX_STORE_ENTRIES) {
+      const oldestKey = store.keys().next().value;
+      if (oldestKey) store.delete(oldestKey);
+    }
     store.set(key, { count: 1, resetAt: now + windowMs });
     return { allowed: true, retryAfter: 0 };
   }
@@ -75,11 +90,33 @@ export function loginRateLimit(req: Request): Response | null {
   return null;
 }
 
-export function likeRateLimit(fingerprint: string): Response | null {
-  const result = checkLimit('like', fingerprint, 10, 60_000); // 10 req/min
+export function likeRateLimit(req: Request): Response | null {
+  const result = checkLimit('like', getIP(req), 10, 60_000);
   if (!result.allowed) {
     return Response.json(
       { success: false, error: 'Too many like requests' },
+      { status: 429, headers: { 'Retry-After': String(result.retryAfter), ...corsHeaders() } }
+    );
+  }
+  return null;
+}
+
+export function captchaRateLimit(req: Request): Response | null {
+  const result = checkLimit('captcha', getIP(req), 20, 5 * 60_000);
+  if (!result.allowed) {
+    return Response.json(
+      { success: false, error: 'Too many captcha requests' },
+      { status: 429, headers: { 'Retry-After': String(result.retryAfter), ...corsHeaders() } }
+    );
+  }
+  return null;
+}
+
+export function trackingRateLimit(req: Request): Response | null {
+  const result = checkLimit('tracking', getIP(req), 30, 60_000);
+  if (!result.allowed) {
+    return Response.json(
+      { success: false, error: 'Too many tracking requests' },
       { status: 429, headers: { 'Retry-After': String(result.retryAfter), ...corsHeaders() } }
     );
   }

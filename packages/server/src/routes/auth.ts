@@ -1,26 +1,21 @@
 import { corsHeaders, handleCors } from '../middleware/cors';
-import { loginRateLimit } from '../middleware/ratelimit';
+import { captchaRateLimit, getIP, loginRateLimit } from '../middleware/ratelimit';
 import { createToken } from '../services/jwt';
-import { getUserByUsername, updateLastActive, createUser } from '../db/queries/users';
+import { getUserByUsername, updateLastActive } from '../db/queries/users';
 import { securityService } from '../services/security';
 import { getLockout, updateLockout, resetLockout } from '../db/queries/lockouts';
 import { saveCaptcha, verifyAndConsumeCaptcha } from '../db/queries/captchas';
 import { generateCaptchaSVG } from '../services/captcha';
-
-async function hashPassword(password: string): Promise<string> {
-  return Bun.password.hash(password, { algorithm: 'bcrypt', cost: 12 });
-}
+import { readJson } from '../middleware/body';
+import { requireAuth } from '../middleware/auth';
+import { getSessionToken } from '../services/session-token';
+import { getVisitorId } from '../services/visitor-id';
+import { SESSION_IDLE_SECONDS, sessionCookie } from '../services/session-policy';
+let activePasswordChecks = 0;
+const MAX_PASSWORD_CHECKS = 2;
 
 function getClientIp(req: Request, server: any): string {
-  const forwarded = req.headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
-  const realIp = req.headers.get('x-real-ip');
-  if (realIp) return realIp;
-  try {
-    const ip = server?.requestIP?.(req);
-    if (ip?.address) return ip.address;
-  } catch (e) {}
-  return '127.0.0.1';
+  return getIP(req);
 }
 
 export async function handleAuth(req: Request, server?: any): Promise<Response> {
@@ -29,12 +24,29 @@ export async function handleAuth(req: Request, server?: any): Promise<Response> 
 
   const url = new URL(req.url);
 
+  if (url.pathname === '/api/auth/session' && req.method === 'GET') {
+    const auth = await requireAuth(req);
+    if (!auth.authorized) return auth.response!;
+    return Response.json({ success: true, data: { authenticated: true } }, { headers: corsHeaders() });
+  }
+
+  if (url.pathname === '/api/auth/logout' && req.method === 'POST') {
+    const token = getSessionToken(req);
+    if (token) await securityService.logoutCurrent(token);
+    return Response.json(
+      { success: true, data: { loggedOut: true } },
+      { headers: { ...corsHeaders(), 'Set-Cookie': sessionCookie('', 0) } }
+    );
+  }
+
   // GET /api/auth/captcha?cid=xxx
   if (url.pathname === '/api/auth/captcha' && req.method === 'GET') {
+    const rateLimitResponse = captchaRateLimit(req);
+    if (rateLimitResponse) return rateLimitResponse;
     const cid = url.searchParams.get('cid');
-    if (!cid) {
+    if (!cid || !/^[a-f0-9-]{36}$/i.test(cid)) {
       return Response.json(
-        { success: false, error: 'cid parameter is required' },
+        { success: false, error: 'A valid captcha id is required' },
         { status: 400, headers: corsHeaders() }
       );
     }
@@ -55,13 +67,16 @@ export async function handleAuth(req: Request, server?: any): Promise<Response> 
     const rateLimitResponse = loginRateLimit(req);
     if (rateLimitResponse) return rateLimitResponse;
 
-    const body = await req.json();
-    const password = body.password as string;
-    const cid = body.cid as string;
-    const captcha = body.captcha as string;
-    const fingerprint = (body.fingerprint as string) || req.headers.get('user-agent') || 'default';
+    const body = await readJson(req, 8 * 1024);
+    const password = typeof body.password === 'string' ? body.password : '';
+    const cid = typeof body.cid === 'string' ? body.cid : '';
+    const captcha = typeof body.captcha === 'string' ? body.captcha : '';
+    if (password.length > 128 || !/^[a-f0-9-]{36}$/i.test(cid) || !/^[a-z0-9]{4}$/i.test(captcha)) {
+      return Response.json({ success: false, error: 'Invalid login payload' }, { status: 400, headers: corsHeaders() });
+    }
 
     const ip = getClientIp(req, server);
+    const fingerprint = await getVisitorId(req, 'login');
 
     // 1. Check lockout
     const lockout = await getLockout(ip, fingerprint);
@@ -141,8 +156,20 @@ export async function handleAuth(req: Request, server?: any): Promise<Response> 
       return recordFailedAttempt('密码验证失败');
     }
 
-    const valid = await Bun.password.verify(password, user.password_hash);
-    await new Promise(resolve => setTimeout(resolve, 500));
+    if (activePasswordChecks >= MAX_PASSWORD_CHECKS) {
+      return Response.json(
+        { success: false, error: '登录服务繁忙，请稍后重试' },
+        { status: 503, headers: { 'Retry-After': '2', ...corsHeaders() } }
+      );
+    }
+    activePasswordChecks++;
+    let valid = false;
+    try {
+      valid = await Bun.password.verify(password, user.password_hash);
+      await new Promise(resolve => setTimeout(resolve, 500));
+    } finally {
+      activePasswordChecks--;
+    }
 
     if (!valid) {
       return recordFailedAttempt('密码验证失败');
@@ -150,6 +177,7 @@ export async function handleAuth(req: Request, server?: any): Promise<Response> 
 
     const token = await createToken({ username: user.username, userId: user.id });
     await updateLastActive(user.id);
+    await resetLockout(ip, fingerprint);
 
     // Record session and audit log
     const ua = req.headers.get('user-agent') || 'Unknown User-Agent';
@@ -172,39 +200,10 @@ export async function handleAuth(req: Request, server?: any): Promise<Response> 
       {
         success: true,
         data: {
-          token,
-          expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+          expires_at: new Date(Date.now() + SESSION_IDLE_SECONDS * 1000).toISOString(),
         },
       },
-      { headers: corsHeaders() }
-    );
-  }
-
-  // Setup endpoint: create admin user (one-time)
-  if (url.pathname === '/api/auth/setup' && req.method === 'POST') {
-    const body = await req.json();
-    const password = body.password as string;
-    if (!password || password.length < 8) {
-      return Response.json(
-        { success: false, error: 'Password must be at least 8 characters' },
-        { status: 400, headers: corsHeaders() }
-      );
-    }
-
-    const existing = await getUserByUsername('admin');
-    if (existing) {
-      return Response.json(
-        { success: false, error: 'Admin user already exists' },
-        { status: 409, headers: corsHeaders() }
-      );
-    }
-
-    const hash = await hashPassword(password);
-    await createUser('admin', hash);
-
-    return Response.json(
-      { success: true, data: { message: 'Admin user created' } },
-      { status: 201, headers: corsHeaders() }
+      { headers: { ...corsHeaders(), 'Set-Cookie': sessionCookie(token) } }
     );
   }
 

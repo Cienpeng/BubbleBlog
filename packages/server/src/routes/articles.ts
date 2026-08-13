@@ -16,14 +16,16 @@ import { getOrCreateTags, setArticleTags } from '../db/queries/tags';
 import { renderMarkdown } from '../markdown/renderer';
 import { verifyToken } from '../services/jwt';
 import { securityService } from '../services/security';
+import { readFormData, readJson, RequestBodyError } from '../middleware/body';
+import { getSessionToken } from '../services/session-token';
 
 const ALLOWED_MD_EXTENSIONS = ['.md', '.markdown', '.txt'];
 
 async function getUserId(req: Request): Promise<{ userId: number; username: string } | null> {
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = getSessionToken(req);
+  if (!token) return null;
   try {
-    return verifyToken(authHeader.slice(7));
+    return verifyToken(token);
   } catch (e) {
     return null;
   }
@@ -42,6 +44,14 @@ export async function handleArticles(req: Request): Promise<Response> {
     const offsetStr = url.searchParams.get('offset');
     const offset = offsetStr ? parseInt(offsetStr) : undefined;
     const tag = url.searchParams.get('tag') || undefined;
+    if (
+      !Number.isInteger(page) || page < 1 || page > 10_000 ||
+      !Number.isInteger(limit) || limit < 1 || limit > 50 ||
+      (offset !== undefined && (!Number.isInteger(offset) || offset < 0 || offset > 500_000)) ||
+      (tag !== undefined && tag.length > 50)
+    ) {
+      return Response.json({ success: false, error: 'Invalid pagination parameters' }, { status: 400, headers: corsHeaders() });
+    }
     const result = await getPublishedArticles(page, limit, tag, offset);
     return Response.json({ success: true, data: result }, { headers: corsHeaders() });
   }
@@ -57,13 +67,14 @@ export async function handleArticles(req: Request): Promise<Response> {
 
     // Security check: draft articles are private and only viewable by authenticated admins
     if (article.status === 'draft') {
-      const user = await getUserId(req);
-      if (!user) {
+      const auth = await requireAuth(req);
+      if (!auth.authorized) {
         return Response.json({ success: false, error: 'Not found' }, { status: 404, headers: corsHeaders() });
       }
     }
 
-    return Response.json({ success: true, data: article }, { headers: corsHeaders() });
+    const { content_md: _source, status: _status, ...publicArticle } = article;
+    return Response.json({ success: true, data: publicArticle }, { headers: corsHeaders() });
   }
 
   // ---- Protected routes below ----
@@ -74,7 +85,7 @@ export async function handleArticles(req: Request): Promise<Response> {
     if (!auth.authorized) return auth.response!;
     const articles = await getAllArticles();
     return Response.json(
-      { success: true, data: articles, newToken: auth.newToken },
+      { success: true, data: articles },
       { headers: corsHeaders() }
     );
   }
@@ -85,14 +96,15 @@ export async function handleArticles(req: Request): Promise<Response> {
     if (!auth.authorized) return auth.response!;
 
     try {
-      const body = await req.json();
+      const body = await readJson(req, 1024 * 1024);
       const markdown = body.markdown || '';
       const rendered = renderMarkdown(markdown);
       return Response.json(
-        { success: true, data: { html: rendered.html }, newToken: auth.newToken },
+        { success: true, data: { html: rendered.html } },
         { headers: corsHeaders() }
       );
     } catch (e) {
+      if (e instanceof RequestBodyError) throw e;
       return Response.json(
         { success: false, error: 'Failed to render markdown' },
         { status: 400, headers: corsHeaders() }
@@ -110,7 +122,7 @@ export async function handleArticles(req: Request): Promise<Response> {
     let body: any = {};
 
     if (contentType.includes('multipart/form-data')) {
-      const formData = await req.formData();
+      const formData = await readFormData(req, 5 * 1024 * 1024 + 64 * 1024);
       const file = formData.get('file');
       if (!file || !(file instanceof File)) {
         return Response.json(
@@ -136,7 +148,7 @@ export async function handleArticles(req: Request): Promise<Response> {
 
       markdown = await file.text();
     } else if (contentType.includes('application/json')) {
-      body = await req.json();
+      body = await readJson(req, 5 * 1024 * 1024);
       markdown = body.content_md || body.content || '';
       if (!markdown) {
         return Response.json(
@@ -152,12 +164,23 @@ export async function handleArticles(req: Request): Promise<Response> {
     }
 
     const rendered = renderMarkdown(markdown);
+    const title = typeof body.title === 'string' ? body.title.trim() : rendered.title.trim();
+    if (
+      !title || title.length > 255 || rendered.excerpt.length > 500 ||
+      (rendered.coverImage?.length || 0) > 255 ||
+      (body.tags !== undefined && (
+        !Array.isArray(body.tags) || body.tags.length > 20 ||
+        body.tags.some((tag: unknown) => typeof tag !== 'string' || tag.length > 50)
+      ))
+    ) {
+      return Response.json({ success: false, error: 'Article metadata is invalid or too long' }, { status: 400, headers: corsHeaders() });
+    }
 
     const article = await createArticle({
-      title: body.title || rendered.title,
+      title,
       content_md: markdown,
       excerpt: rendered.excerpt,
-      cover_image: rendered.coverImage,
+      cover_image: rendered.coverImage || undefined,
     });
 
     await setArticleContentHtml(article.id, rendered.html);
@@ -194,7 +217,7 @@ export async function handleArticles(req: Request): Promise<Response> {
     }
 
     return Response.json(
-      { success: true, data: created, newToken: auth.newToken },
+      { success: true, data: created },
       { status: 201, headers: corsHeaders() }
     );
   }
@@ -210,7 +233,7 @@ export async function handleArticles(req: Request): Promise<Response> {
       return Response.json({ success: false, error: 'Not found' }, { status: 404, headers: corsHeaders() });
     }
     return Response.json(
-      { success: true, data: article, newToken: auth.newToken },
+      { success: true, data: article },
       { headers: corsHeaders() }
     );
   }
@@ -234,7 +257,7 @@ export async function handleArticles(req: Request): Promise<Response> {
     }
 
     return Response.json(
-      { success: true, data: article, newToken: auth.newToken },
+      { success: true, data: article },
       { headers: corsHeaders() }
     );
   }
@@ -258,7 +281,7 @@ export async function handleArticles(req: Request): Promise<Response> {
     }
 
     return Response.json(
-      { success: true, data: article, newToken: auth.newToken },
+      { success: true, data: article },
       { headers: corsHeaders() }
     );
   }
@@ -269,12 +292,23 @@ export async function handleArticles(req: Request): Promise<Response> {
     const auth = await requireAuth(req);
     if (!auth.authorized) return auth.response!;
 
-    const body = await req.json();
+    const body = await readJson(req, 5 * 1024 * 1024);
     const id = parseInt(updateMatch[1]);
+    let renderedHtml: string | undefined;
 
-    if (body.content_md) {
+    if (body.title !== undefined && (typeof body.title !== 'string' || body.title.trim().length < 1 || body.title.length > 255)) {
+      return Response.json({ success: false, error: 'Invalid title' }, { status: 400, headers: corsHeaders() });
+    }
+    if (body.content_md !== undefined && typeof body.content_md !== 'string') {
+      return Response.json({ success: false, error: 'Invalid markdown content' }, { status: 400, headers: corsHeaders() });
+    }
+    if (body.tags !== undefined && (!Array.isArray(body.tags) || body.tags.length > 20 || body.tags.some((tag: unknown) => typeof tag !== 'string' || tag.length > 50))) {
+      return Response.json({ success: false, error: 'Invalid tags' }, { status: 400, headers: corsHeaders() });
+    }
+
+    if (body.content_md !== undefined) {
       const rendered = renderMarkdown(body.content_md);
-      body.content_html = rendered.html;
+      renderedHtml = rendered.html;
       // Tags from frontmatter
       if (rendered.tags && rendered.tags.length > 0) {
         const tags = await getOrCreateTags(rendered.tags);
@@ -305,8 +339,8 @@ export async function handleArticles(req: Request): Promise<Response> {
       return Response.json({ success: false, error: 'Not found' }, { status: 404, headers: corsHeaders() });
     }
 
-    if (body.content_html) {
-      await setArticleContentHtml(id, body.content_html);
+    if (renderedHtml !== undefined) {
+      await setArticleContentHtml(id, renderedHtml);
     }
 
     const updated = await getArticleById(id);
@@ -317,7 +351,7 @@ export async function handleArticles(req: Request): Promise<Response> {
     }
 
     return Response.json(
-      { success: true, data: updated, newToken: auth.newToken },
+      { success: true, data: updated },
       { headers: corsHeaders() }
     );
   }
@@ -337,7 +371,7 @@ export async function handleArticles(req: Request): Promise<Response> {
     }
 
     return Response.json(
-      { success: true, data: { deleted: true }, newToken: auth.newToken },
+      { success: true, data: { deleted: true } },
       { headers: corsHeaders() }
     );
   }

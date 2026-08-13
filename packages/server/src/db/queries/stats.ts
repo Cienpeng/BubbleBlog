@@ -8,6 +8,7 @@ export async function recordPageView(articleId: number, fingerprint: string): Pr
     SELECT ${articleId}, ${fingerprint}, NOW()
     FROM articles
     WHERE id = ${articleId} AND status = 'published'
+    ON CONFLICT (article_id, fingerprint, (visited_at::date)) DO NOTHING
   `;
 }
 
@@ -26,7 +27,7 @@ export async function getDailyViews(days: number = 30): Promise<DailyViews[]> {
     GROUP BY DATE(visited_at)
     ORDER BY date
   `;
-  return rows as DailyViews[];
+  return rows as unknown as DailyViews[];
 }
 
 // ---- Reading Sessions ----
@@ -42,6 +43,8 @@ export async function recordReadingSession(
     SELECT ${articleId}, ${fingerprint}, ${durationSeconds}, NOW()
     FROM articles
     WHERE id = ${articleId} AND status = 'published'
+    ON CONFLICT (article_id, fingerprint, (created_at::date))
+    DO UPDATE SET duration_seconds = GREATEST(reading_sessions.duration_seconds, EXCLUDED.duration_seconds)
   `;
 }
 
@@ -53,6 +56,7 @@ export interface ArticleReadingStats {
   actual_avg_seconds: number;
   actual_avg_minutes: number;
   session_count: number;
+  likes_count: number;
 }
 
 export async function getAllArticlesReadingStats(): Promise<ArticleReadingStats[]> {
@@ -68,10 +72,11 @@ export async function getAllArticlesReadingStats(): Promise<ArticleReadingStats[
       (SELECT COUNT(*)::int FROM likes l WHERE l.article_id = a.id) AS likes_count
     FROM articles a
     LEFT JOIN reading_sessions rs ON rs.article_id = a.id
+    WHERE a.status = 'published'
     GROUP BY a.id, a.title, a.slug, a.reading_time
-    ORDER BY a.id DESC
+    ORDER BY a.published_at DESC NULLS LAST, a.id DESC
   `;
-  return rows as ArticleReadingStats[];
+  return rows as unknown as ArticleReadingStats[];
 }
 
 export async function getLatestArticlesReadingStats(limit: number = 3): Promise<ArticleReadingStats[]> {
@@ -87,11 +92,33 @@ export async function getLatestArticlesReadingStats(limit: number = 3): Promise<
       (SELECT COUNT(*)::int FROM likes l WHERE l.article_id = a.id) AS likes_count
     FROM articles a
     LEFT JOIN reading_sessions rs ON rs.article_id = a.id
+    WHERE a.status = 'published'
     GROUP BY a.id, a.title, a.slug, a.reading_time
-    ORDER BY a.id DESC
+    ORDER BY a.published_at DESC NULLS LAST, a.id DESC
     LIMIT ${limit}
   `;
-  return rows as ArticleReadingStats[];
+  return rows as unknown as ArticleReadingStats[];
+}
+
+export async function getLatestArticlesReadingStats(limit: number = 3): Promise<ArticleReadingStats[]> {
+  const rows = await sql`
+    SELECT
+      a.id AS article_id,
+      a.title,
+      a.slug,
+      COALESCE(a.reading_time, 1) AS estimated_minutes,
+      COALESCE(AVG(rs.duration_seconds), 0) AS actual_avg_seconds,
+      COALESCE(AVG(rs.duration_seconds) / 60.0, 0) AS actual_avg_minutes,
+      COUNT(rs.id)::int AS session_count,
+      (SELECT COUNT(*)::int FROM likes l WHERE l.article_id = a.id) AS likes_count
+    FROM articles a
+    LEFT JOIN reading_sessions rs ON rs.article_id = a.id
+    WHERE a.status = 'published'
+    GROUP BY a.id, a.title, a.slug, a.reading_time
+    ORDER BY a.published_at DESC NULLS LAST, a.id DESC
+    LIMIT ${limit}
+  `;
+  return rows as unknown as ArticleReadingStats[];
 }
 
 export async function getArticleReadingStats(articleId: number): Promise<ArticleReadingStats | null> {
@@ -107,7 +134,7 @@ export async function getArticleReadingStats(articleId: number): Promise<Article
       (SELECT COUNT(*)::int FROM likes l WHERE l.article_id = a.id) AS likes_count
     FROM articles a
     LEFT JOIN reading_sessions rs ON rs.article_id = a.id
-    WHERE a.id = ${articleId}
+    WHERE a.id = ${articleId} AND a.status = 'published'
     GROUP BY a.id, a.title, a.slug, a.reading_time
   `;
   return rows.length > 0 ? (rows[0] as ArticleReadingStats) : null;

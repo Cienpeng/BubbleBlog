@@ -17,7 +17,7 @@ export async function getCarouselForArticle(slug: string): Promise<CarouselImage
       ORDER BY sort_order`;
 
     if (customRows.length > 0) {
-      return customRows as CarouselImage[];
+      return customRows as unknown as CarouselImage[];
     }
   }
 
@@ -28,7 +28,7 @@ export async function getCarouselForArticle(slug: string): Promise<CarouselImage
     WHERE is_default = true
     ORDER BY sort_order`;
 
-  return defaultRows as CarouselImage[];
+  return defaultRows as unknown as CarouselImage[];
 }
 
 export async function addCarouselImage(articleId: number, imageUrl: string, sortOrder: number = 0): Promise<CarouselImage> {
@@ -50,7 +50,7 @@ export async function getAllDefaultCarousel(): Promise<CarouselImage[]> {
     FROM carousel_images
     WHERE is_default = true
     ORDER BY sort_order`;
-  return rows as CarouselImage[];
+  return rows as unknown as CarouselImage[];
 }
 
 export async function addDefaultCarouselImage(imageUrl: string, sortOrder: number = 0): Promise<CarouselImage> {

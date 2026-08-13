@@ -9,6 +9,7 @@ export interface ApiResponse<T> {
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${url}`, {
+    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
@@ -28,11 +29,9 @@ export const api = {
 
 // Admin API — includes auth header and returns newToken
 async function adminRequest<T>(url: string, options?: RequestInit): Promise<{ data: T; newToken?: string }> {
-  const token = localStorage.getItem('token');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE}${url}`, { headers, ...options });
+  const res = await fetch(`${BASE}${url}`, { headers, credentials: 'same-origin', ...options });
 
   if (res.status === 401) {
     let errMsg = '当前登录会话已失效或已被强制下线，请重新登录';
@@ -57,12 +56,9 @@ export const adminApi = {
     adminRequest<T>(url, { method: 'PUT', body: body ? JSON.stringify(body) : undefined }),
   delete: <T>(url: string) => adminRequest<T>(url, { method: 'DELETE' }),
   upload: <T>(url: string, formData: FormData) => {
-    const token = localStorage.getItem('token');
-    const headers: Record<string, string> = {};
-    if (token) headers['Authorization'] = `Bearer ${token}`;
     return fetch(`${url}`, {
       method: 'POST',
-      headers,
+      credentials: 'same-origin',
       body: formData,
     }).then(async res => {
       if (res.status === 401) {

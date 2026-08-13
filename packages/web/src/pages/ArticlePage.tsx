@@ -9,17 +9,8 @@ import { IconArrowLeft, IconCalendar, IconClock, IconTag, IconCopy, IconCheck } 
 import LikeButton from '@/components/LikeButton';
 import { enhanceCodeBlocks } from '@/lib/markdown';
 import { useObfuscatedImage } from '@/hooks/useObfuscatedImage';
-
-
-function getFingerprint(): string {
-  const stored = sessionStorage.getItem('_fp');
-  if (stored) return stored;
-  const fp = Math.random().toString(36).slice(2) + Date.now().toString(36);
-  sessionStorage.setItem('_fp', fp);
-  return fp;
-}
-
-
+import 'katex/dist/katex.min.css';
+import 'highlight.js/styles/atom-one-dark.css';
 
 export default function ArticlePage() {
   const articleCornerBanner = useObfuscatedImage('/article-corner-banner.dat');
@@ -69,7 +60,6 @@ export default function ArticlePage() {
   // Track page view + reading time
   useEffect(() => {
     if (!article) return;
-    const fp = getFingerprint();
     const articleId = (article as any).id;
 
     if (!trackedRef.current && articleId) {
@@ -77,7 +67,7 @@ export default function ArticlePage() {
       fetch('/api/track/view', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ article_id: articleId, fingerprint: fp }),
+        body: JSON.stringify({ article_id: articleId }),
       }).catch(() => {});
     }
 
@@ -85,7 +75,7 @@ export default function ArticlePage() {
       if (!articleId) return;
       const duration = Math.round((Date.now() - startTimeRef.current) / 1000);
       if (duration < 3) return;
-      const body = JSON.stringify({ article_id: articleId, fingerprint: fp, duration_seconds: duration });
+      const body = JSON.stringify({ article_id: articleId, duration_seconds: duration });
       if (navigator.sendBeacon) {
         navigator.sendBeacon('/api/track/reading', new Blob([body], { type: 'application/json' }));
       } else {

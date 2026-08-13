@@ -3,10 +3,12 @@ import katex from '@vscode/markdown-it-katex';
 import taskLists from 'markdown-it-task-lists';
 import footnote from 'markdown-it-footnote';
 import mark from 'markdown-it-mark';
+import { sanitizeArticleHtml } from './sanitize';
 
-// Configure MarkdownIt: allow raw HTML for colors/background custom styling
+// Markdown may contain common inline/block HTML. The final output is sanitized
+// with an allowlist before it is inserted into the page DOM.
 const md = new MarkdownIt({
-  html: true,         // Enable raw HTML
+  html: true,
   linkify: true,      // Auto-link URLs
   typographer: true,  // Smart quotes, dashes
   breaks: true,       // Convert \n to <br>
@@ -16,7 +18,8 @@ const md = new MarkdownIt({
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
-    return `<pre><code class="language-${lang || 'plaintext'}">${escaped}</code></pre>`;
+    const safeLang = (lang || 'plaintext').toLowerCase().replace(/[^a-z0-9_+-]/g, '').slice(0, 32) || 'plaintext';
+    return `<pre><code class="language-${safeLang}">${escaped}</code></pre>`;
   },
 });
 
@@ -26,13 +29,24 @@ md.use(katex)
   .use(footnote)
   .use(mark);
 
-// Basic XSS sanitization (DOMPurify runs on frontend as well)
-function sanitize(html: string): string {
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/on\w+\s*=\s*"[^"]*"/gi, '')
-    .replace(/on\w+\s*=\s*'[^']*'/gi, '')
-    .replace(/on\w+\s*=\s*[^\s>]+/gi, '');
+interface RenderEnvironment {
+  katexMarker: string;
+  trustedKatex: string[];
+}
+
+// KaTeX emits a deeply nested, library-owned structure whose inline positioning
+// is required for fractions, matrices, superscripts and subscripts. Keep those
+// trusted fragments outside the user-authored HTML sanitizer and restore them
+// afterwards. KaTeX's own trust option remains disabled by default.
+for (const ruleName of ['math_inline', 'math_inline_block', 'math_inline_bare_block', 'math_block']) {
+  const originalRule = md.renderer.rules[ruleName];
+  if (!originalRule) continue;
+
+  md.renderer.rules[ruleName] = (tokens, idx, options, env: RenderEnvironment, self) => {
+    const rendered = originalRule(tokens, idx, options, env, self);
+    const fragmentIndex = env.trustedKatex.push(rendered) - 1;
+    return `${env.katexMarker}${fragmentIndex}__`;
+  };
 }
 
 interface Frontmatter {
@@ -156,26 +170,49 @@ export interface RenderedArticle {
 
 export function renderMarkdown(markdown: string): RenderedArticle {
   const { frontmatter, content } = parseFrontmatter(markdown);
+  const title = typeof frontmatter.title === 'string' ? frontmatter.title.slice(0, 255) : 'Untitled';
+  const explicitExcerpt = typeof frontmatter.excerpt === 'string'
+    ? frontmatter.excerpt.slice(0, 500)
+    : '';
+  const tags = Array.isArray(frontmatter.tags)
+    ? frontmatter.tags
+        .filter((tag): tag is string => typeof tag === 'string')
+        .map(tag => tag.trim().slice(0, 50))
+        .filter(Boolean)
+        .slice(0, 20)
+    : [];
+  const coverImage = typeof frontmatter.cover === 'string'
+    ? frontmatter.cover.slice(0, 255)
+    : null;
+  const date = typeof frontmatter.date === 'string'
+    ? frontmatter.date.slice(0, 50)
+    : null;
 
-  let html = md.render(content);
+  const renderEnvironment: RenderEnvironment = {
+    katexMarker: `BUBBLE_KATEX_${crypto.randomUUID().replaceAll('-', '')}_`,
+    trustedKatex: [],
+  };
+  let html = sanitizeArticleHtml(md.render(content, renderEnvironment));
+  renderEnvironment.trustedKatex.forEach((fragment, index) => {
+    html = html.replaceAll(`${renderEnvironment.katexMarker}${index}__`, fragment);
+  });
   html = addHeadingIds(html);
-  html = sanitize(html);
 
   const toc = extractTOC(html);
   const wordCount = content.replace(/[#*\->`\[\]()!\s]+/g, ' ').trim().split(/\s+/).length;
   const readingTime = Math.max(1, Math.ceil(wordCount / 200));
 
-  const excerpt = frontmatter.excerpt ||
+  const excerpt = explicitExcerpt ||
     content.replace(/[#*>\[\]`!\-]/g, '').replace(/\s+/g, ' ').trim().slice(0, 200);
 
   return {
     html,
     toc,
-    title: frontmatter.title || 'Untitled',
+    title,
     excerpt,
-    tags: frontmatter.tags || [],
-    coverImage: frontmatter.cover || null,
-    date: frontmatter.date || null,
+    tags,
+    coverImage,
+    date,
     readingTime,
   };
 }

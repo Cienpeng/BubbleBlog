@@ -13,9 +13,12 @@ export async function handleStatsAPI(req: Request): Promise<Response> {
   // GET /api/admin/stats/views?days=30
   if (url.pathname === '/api/admin/stats/views' && req.method === 'GET') {
     const days = parseInt(url.searchParams.get('days') || '30');
+    if (!Number.isInteger(days) || days < 1 || days > 365) {
+      return Response.json({ success: false, error: 'days must be between 1 and 365' }, { status: 400, headers: corsHeaders() });
+    }
     const data = await getDailyViews(days);
     return Response.json(
-      { success: true, data, newToken: auth.newToken },
+      { success: true, data },
       { headers: corsHeaders() }
     );
   }
@@ -23,9 +26,13 @@ export async function handleStatsAPI(req: Request): Promise<Response> {
   // GET /api/admin/stats/articles-reading
   if (url.pathname === '/api/admin/stats/articles-reading' && req.method === 'GET') {
     const limit = url.searchParams.get('limit');
-    const data = limit ? await getLatestArticlesReadingStats(parseInt(limit)) : await getAllArticlesReadingStats();
+    const parsedLimit = limit ? parseInt(limit) : undefined;
+    if (parsedLimit !== undefined && (!Number.isInteger(parsedLimit) || parsedLimit < 1 || parsedLimit > 100)) {
+      return Response.json({ success: false, error: 'limit must be between 1 and 100' }, { status: 400, headers: corsHeaders() });
+    }
+    const data = parsedLimit ? await getLatestArticlesReadingStats(parsedLimit) : await getAllArticlesReadingStats();
     return Response.json(
-      { success: true, data, newToken: auth.newToken },
+      { success: true, data },
       { headers: corsHeaders() }
     );
   }
@@ -41,7 +48,7 @@ export async function handleStatsAPI(req: Request): Promise<Response> {
       );
     }
     return Response.json(
-      { success: true, data, newToken: auth.newToken },
+      { success: true, data },
       { headers: corsHeaders() }
     );
   }

@@ -4,17 +4,7 @@ import { getCarouselForArticle, addCarouselImage, deleteCarouselImage } from '..
 import { getAllDefaultCarousel, addDefaultCarouselImage } from '../db/queries/carousel';
 import { deleteLocalMedia } from './media';
 import sql from '../db/connection';
-import { verifyToken } from '../services/jwt';
-
-async function getUserId(req: Request): Promise<{ userId: number; username: string } | null> {
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) return null;
-  try {
-    return verifyToken(authHeader.slice(7));
-  } catch (e) {
-    return null;
-  }
-}
+import { readJson } from '../middleware/body';
 
 export async function handleCarouselAPI(req: Request): Promise<Response> {
   const corsResponse = handleCors(req);
@@ -30,8 +20,8 @@ export async function handleCarouselAPI(req: Request): Promise<Response> {
     // Security check: draft articles carousel details are private and only viewable by authenticated admins
     const articleRows = await sql`SELECT status FROM articles WHERE slug = ${slug}`;
     if (articleRows.length > 0 && articleRows[0].status === 'draft') {
-      const user = await getUserId(req);
-      if (!user) {
+      const auth = await requireAuth(req);
+      if (!auth.authorized) {
         return Response.json({ success: false, error: 'Not found' }, { status: 404, headers: corsHeaders() });
       }
     }
@@ -59,7 +49,7 @@ export async function handleCarouselAPI(req: Request): Promise<Response> {
 
     const images = await getAllDefaultCarousel();
     return Response.json(
-      { success: true, data: images, newToken: auth.newToken },
+      { success: true, data: images },
       { headers: corsHeaders() }
     );
   }
@@ -69,11 +59,11 @@ export async function handleCarouselAPI(req: Request): Promise<Response> {
     const auth = await requireAuth(req);
     if (!auth.authorized) return auth.response!;
 
-    const body = await req.json();
+    const body = await readJson(req, 8 * 1024);
     const imageUrl = body.image_url as string;
-    if (!imageUrl) {
+    if (!imageUrl || imageUrl.length > 1000 || !(imageUrl.startsWith('/media/') || /^https:\/\//i.test(imageUrl))) {
       return Response.json(
-        { success: false, error: 'image_url is required' },
+        { success: false, error: 'A local media path or HTTPS image URL is required' },
         { status: 400, headers: corsHeaders() }
       );
     }
@@ -93,7 +83,7 @@ export async function handleCarouselAPI(req: Request): Promise<Response> {
 
     const image = await addDefaultCarouselImage(imageUrl, body.sort_order ?? 0);
     return Response.json(
-      { success: true, data: image, newToken: auth.newToken },
+      { success: true, data: image },
       { status: 201, headers: corsHeaders() }
     );
   }
@@ -117,7 +107,7 @@ export async function handleCarouselAPI(req: Request): Promise<Response> {
       );
     }
     return Response.json(
-      { success: true, data: { deleted: true }, newToken: auth.newToken },
+      { success: true, data: { deleted: true } },
       { headers: corsHeaders() }
     );
   }

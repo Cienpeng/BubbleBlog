@@ -46,7 +46,7 @@ interface UserProfile {
 }
 
 export default function Profile() {
-  const { updateToken } = useAuth();
+  const { updateToken, logout } = useAuth();
 
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -87,6 +87,7 @@ export default function Profile() {
   const [savingPw, setSavingPw] = useState(false);
   const [pwMsg, setPwMsg] = useState('');
   const [pwError, setPwError] = useState(false);
+  const passwordMismatch = confirmPw.length > 0 && newPw !== confirmPw;
 
   // Fetch profile
   const fetchProfile = useCallback(async () => {
@@ -258,26 +259,31 @@ export default function Profile() {
     if (!newPw) {
       setPwMsg('请输入新密码'); setPwError(true); return;
     }
-    if (newPw.length < 8) {
-      setPwMsg('新密码至少 8 位'); setPwError(true); return;
+    if (newPw.length < 12 || newPw.length > 128) {
+      setPwMsg('新密码必须为 12 至 128 位'); setPwError(true); return;
+    }
+    if (!confirmPw) {
+      setPwMsg('请再次输入新密码'); setPwError(true); return;
     }
     if (newPw !== confirmPw) {
-      setPwMsg('两次输入的新密码不一致'); setPwError(true); return;
+      setPwMsg(''); setPwError(false); return;
     }
 
     setSavingPw(true);
     try {
-      const { newToken } = await adminApi.put('/api/admin/password', {
+      await adminApi.put('/api/admin/password', {
         current_password: currentPw,
         new_password: newPw,
       });
-      if (newToken) updateToken(newToken);
-      setPwMsg('密码已更新');
+      setPwMsg('密码已更新，请重新登录');
       setPwError(false);
       setCurrentPw('');
       setNewPw('');
       setConfirmPw('');
-      setTimeout(() => setPwMsg(''), 3000);
+      setTimeout(() => {
+        logout();
+        window.location.assign('/login');
+      }, 1200);
     } catch (err: any) {
       setPwMsg(err.message || '密码修改失败');
       setPwError(true);
@@ -581,7 +587,7 @@ export default function Profile() {
                 type="password"
                 value={newPw}
                 onChange={e => setNewPw(e.target.value)}
-                placeholder="至少 8 位字符"
+                placeholder="12 至 128 位字符"
                 autoComplete="new-password"
                 className="w-full px-4 py-2 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.06] outline-none text-sm text-text-primary dark:text-white/90 placeholder-gray-300 dark:placeholder-gray-600 focus:border-brand/30 transition-colors"
               />
@@ -592,11 +598,28 @@ export default function Profile() {
               <input
                 type="password"
                 value={confirmPw}
-                onChange={e => setConfirmPw(e.target.value)}
+                onChange={e => {
+                  setConfirmPw(e.target.value);
+                  if (pwError) {
+                    setPwMsg('');
+                    setPwError(false);
+                  }
+                }}
                 placeholder="再次输入新密码"
                 autoComplete="new-password"
-                className="w-full px-4 py-2 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/5 dark:border-white/[0.06] outline-none text-sm text-text-primary dark:text-white/90 placeholder-gray-300 dark:placeholder-gray-600 focus:border-brand/30 transition-colors"
+                aria-invalid={passwordMismatch}
+                aria-describedby={passwordMismatch ? 'confirm-password-error' : undefined}
+                className={`w-full px-4 py-2 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border outline-none text-sm text-text-primary dark:text-white/90 placeholder-gray-300 dark:placeholder-gray-600 transition-all duration-200 ${
+                  passwordMismatch
+                    ? 'border-like/70 bg-like/[0.03] dark:bg-like/[0.06] focus:border-like ring-2 ring-like/10'
+                    : 'border-black/5 dark:border-white/[0.06] focus:border-brand/30'
+                }`}
               />
+              {passwordMismatch && (
+                <p id="confirm-password-error" className="text-[11px] text-like mt-1.5 animate-fade-in">
+                  两次输入的新密码不一致
+                </p>
+              )}
             </div>
 
             {pwMsg && (

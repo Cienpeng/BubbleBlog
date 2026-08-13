@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import type { ArticleListItem } from '@bubbleblog/shared';
 import { IconCalendar, IconClock } from './Icons';
+import { preloadModule, routeModules } from '@/routes/routeModules';
 
 interface ArticleCardProps {
   article: ArticleListItem;
@@ -51,7 +52,12 @@ export default function ArticleCard({ article, variant, style, isHovered, isDimm
         ...style,
       }}
       onClick={handleClick}
-      onMouseEnter={() => onHover(true)}
+      onMouseEnter={() => {
+        onHover(true);
+        preloadModule(routeModules.article);
+      }}
+      onFocus={() => preloadModule(routeModules.article)}
+      onTouchStart={() => preloadModule(routeModules.article)}
       onMouseLeave={() => onHover(false)}
       role="button"
       tabIndex={0}

@@ -7,11 +7,6 @@ interface LikeButtonProps {
   initialLiked: boolean;
 }
 
-function getFingerprint(): string {
-  const nav = window.navigator;
-  return `${nav.userAgent}-${screen.width}x${screen.height}`;
-}
-
 export default function LikeButton({ slug, initialCount, initialLiked }: LikeButtonProps) {
   const [count, setCount] = useState(initialCount);
   const [liked, setLiked] = useState(initialLiked);
@@ -20,8 +15,7 @@ export default function LikeButton({ slug, initialCount, initialLiked }: LikeBut
     let active = true;
     const fetchLikeInfo = async () => {
       try {
-        const fingerprint = getFingerprint();
-        const res = await fetch(`/api/articles/${slug}/likes?fingerprint=${encodeURIComponent(fingerprint)}`);
+        const res = await fetch(`/api/articles/${slug}/likes`);
         const json = await res.json();
         if (json.success && active) {
           setCount(json.data.count);
@@ -42,7 +36,7 @@ export default function LikeButton({ slug, initialCount, initialLiked }: LikeBut
       const res = await fetch(`/api/articles/${slug}/likes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fingerprint: getFingerprint() }),
+        body: '{}',
       });
       const json = await res.json();
       if (json.success) {

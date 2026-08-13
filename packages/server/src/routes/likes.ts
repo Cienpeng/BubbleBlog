@@ -1,18 +1,10 @@
 import { corsHeaders, handleCors } from '../middleware/cors';
 import { likeRateLimit } from '../middleware/ratelimit';
-import { getArticleIdBySlug, toggleLike, getLikeInfo } from '../db/queries/likes';
+import { toggleLike, getLikeInfo } from '../db/queries/likes';
 import sql from '../db/connection';
-import { verifyToken } from '../services/jwt';
-
-async function getUserId(req: Request): Promise<{ userId: number; username: string } | null> {
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader?.startsWith('Bearer ')) return null;
-  try {
-    return verifyToken(authHeader.slice(7));
-  } catch (e) {
-    return null;
-  }
-}
+import { requireAuth } from '../middleware/auth';
+import { readJson } from '../middleware/body';
+import { getVisitorId } from '../services/visitor-id';
 
 export async function handleLikes(req: Request): Promise<Response> {
   const corsResponse = handleCors(req);
@@ -31,25 +23,20 @@ export async function handleLikes(req: Request): Promise<Response> {
     }
     const article = articleRows[0];
     if (article.status === 'draft') {
-      const user = await getUserId(req);
-      if (!user) {
+      const auth = await requireAuth(req);
+      if (!auth.authorized) {
         return Response.json({ success: false, error: 'Article not found' }, { status: 404, headers: corsHeaders() });
       }
     }
 
-    const fingerprint = url.searchParams.get('fingerprint') || '';
+    const fingerprint = await getVisitorId(req, 'likes');
     const info = await getLikeInfo(article.id, fingerprint);
     return Response.json({ success: true, data: info }, { headers: corsHeaders() });
   }
 
   if (likesMatch && req.method === 'POST') {
-    const body = await req.json();
-    const fingerprint = (body.fingerprint || '').toString();
-    if (!fingerprint) {
-      return Response.json({ success: false, error: 'fingerprint is required' }, { status: 400, headers: corsHeaders() });
-    }
-
-    const rateLimitResponse = likeRateLimit(fingerprint);
+    await readJson(req, 4 * 1024);
+    const rateLimitResponse = likeRateLimit(req);
     if (rateLimitResponse) return rateLimitResponse;
 
     const slug = decodeURIComponent(likesMatch[1]);
@@ -61,12 +48,13 @@ export async function handleLikes(req: Request): Promise<Response> {
     }
     const article = articleRows[0];
     if (article.status === 'draft') {
-      const user = await getUserId(req);
-      if (!user) {
+      const auth = await requireAuth(req);
+      if (!auth.authorized) {
         return Response.json({ success: false, error: 'Article not found' }, { status: 404, headers: corsHeaders() });
       }
     }
 
+    const fingerprint = await getVisitorId(req, 'likes');
     const info = await toggleLike(article.id, fingerprint);
     return Response.json({ success: true, data: info }, { headers: corsHeaders() });
   }

@@ -12,6 +12,9 @@ export async function handleSearch(req: Request): Promise<Response> {
     if (!q.trim()) {
       return Response.json({ success: false, error: 'Query parameter q is required' }, { status: 400, headers: corsHeaders() });
     }
+    if (q.length > 100) {
+      return Response.json({ success: false, error: 'Search query is too long' }, { status: 400, headers: corsHeaders() });
+    }
 
     const sanitized = q.replace(/[&|!:*()]/g, ' ').trim();
     if (!sanitized) {
