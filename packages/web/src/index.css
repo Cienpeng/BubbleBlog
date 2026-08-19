@@ -135,8 +135,17 @@
   }
 
   /* Markdown prose styling overrides and additions */
+  .prose h2,
+  .prose h3,
+  .prose h4 {
+    /* Keep the organic heading background sized to its text, while ensuring
+       consecutive headings always participate in block layout. */
+    display: block;
+    width: fit-content;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
   .prose h2 {
-    display: inline-block;
     background: #5DAC81;
     color: #fff !important;
     font-size: 1.2rem;
@@ -149,7 +158,6 @@
     line-height: 1.5;
   }
   .prose h3 {
-    display: inline-block;
     background: #5DAC81;
     color: #fff !important;
     font-size: 1.05rem;
@@ -162,7 +170,6 @@
     line-height: 1.5;
   }
   .prose h4 {
-    display: inline-block;
     background: #5DAC81;
     color: #fff !important;
     font-size: 0.95rem;
