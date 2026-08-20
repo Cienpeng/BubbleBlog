@@ -30,6 +30,18 @@ export async function getDailyViews(days: number = 30): Promise<DailyViews[]> {
   return rows as unknown as DailyViews[];
 }
 
+export async function getAllDailyViews(): Promise<DailyViews[]> {
+  const rows = await sql`
+    SELECT
+      TO_CHAR(DATE(visited_at), 'YYYY-MM-DD') AS date,
+      COUNT(*)::int AS count
+    FROM page_views
+    GROUP BY DATE(visited_at)
+    ORDER BY DATE(visited_at)
+  `;
+  return rows as unknown as DailyViews[];
+}
+
 // ---- Reading Sessions ----
 
 export async function recordReadingSession(

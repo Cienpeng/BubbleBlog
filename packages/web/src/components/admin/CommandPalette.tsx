@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { IconBubble, IconSearch, IconPlus, IconArticles, IconStats, IconAppearance, IconHome, IconUser, IconShield } from '@/components/Icons';
 
@@ -17,7 +17,7 @@ export default function CommandPalette() {
   const inputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
 
-  const commands: Command[] = [
+  const commands = useMemo<Command[]>(() => [
     { id: 'new-article', label: '写新文章', shortcut: 'N', Icon: IconPlus, action: () => navigate('/admin/articles/new') },
     { id: 'dashboard', label: '文章管理', shortcut: 'D', Icon: IconArticles, action: () => navigate('/admin') },
     { id: 'stats', label: '数据统计', shortcut: 'S', Icon: IconStats, action: () => navigate('/admin/stats') },
@@ -25,19 +25,36 @@ export default function CommandPalette() {
     { id: 'security', label: '安全中心', shortcut: 'G', Icon: IconShield, action: () => navigate('/admin/security') },
     { id: 'profile', label: '个人资料', shortcut: 'P', Icon: IconUser, action: () => navigate('/admin/profile') },
     { id: 'home', label: '返回前台', shortcut: 'H', Icon: IconHome, action: () => navigate('/') },
-  ];
+  ], [navigate]);
 
-  const filtered = query
+  const filtered = useMemo(() => query
     ? commands.filter(c => c.label.toLowerCase().includes(query.toLowerCase()))
-    : commands;
+    : commands, [commands, query]);
 
   const onKeyDown = useCallback((e: KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       setOpen(o => !o);
       return;
     }
-    if (!open) return;
+
+    if (!open) {
+      const target = e.target as HTMLElement | null;
+      const isEditing = target?.isContentEditable
+        || target?.tagName === 'INPUT'
+        || target?.tagName === 'TEXTAREA'
+        || target?.tagName === 'SELECT';
+      if (isEditing || e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.key.length !== 1) return;
+
+      const shortcutCommand = commands.find(
+        command => command.shortcut?.toLowerCase() === e.key.toLowerCase(),
+      );
+      if (shortcutCommand) {
+        e.preventDefault();
+        shortcutCommand.action();
+      }
+      return;
+    }
 
     if (e.key === 'Escape') {
       setOpen(false);
@@ -52,7 +69,7 @@ export default function CommandPalette() {
       filtered[selectedIdx].action();
       setOpen(false);
     }
-  }, [open, filtered, selectedIdx, navigate]);
+  }, [commands, filtered, open, selectedIdx]);
 
   useEffect(() => {
     document.addEventListener('keydown', onKeyDown);
