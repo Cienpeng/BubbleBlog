@@ -5,6 +5,7 @@ import { IconCheck, IconClose } from '@/components/Icons';
 import { adminApi } from '@/lib/api';
 import { api } from '@/lib/api';
 import ImageCropperModal from '@/components/admin/ImageCropperModal';
+import { getSessionImageUrl } from '@/lib/sessionImageCache';
 
 
 interface Settings {
@@ -219,7 +220,7 @@ export default function Appearance() {
         </div>
         {bgUrl && (
           <div className="rounded-2xl overflow-hidden h-32 bg-black/[0.02] dark:bg-white/[0.02]">
-            <img src={bgUrl} alt="背景预览" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+            <img src={getSessionImageUrl(bgUrl)} alt="背景预览" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
           </div>
         )}
         {!bgUrl && (
@@ -296,7 +297,7 @@ export default function Appearance() {
             >
               <div className="w-16 h-10 rounded-xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.03] flex-shrink-0">
                 {!img.image_url.startsWith('__DEFAULT_GRADIENT_') ? (
-                  <img src={img.image_url} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  <img src={getSessionImageUrl(img.image_url)} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-brand/30 to-link/30" />
                 )}

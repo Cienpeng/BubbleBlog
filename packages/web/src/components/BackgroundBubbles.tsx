@@ -1,16 +1,21 @@
 import { useBackground } from '@/hooks/useBackground';
+import { useSessionImage } from '@/hooks/useSessionImage';
 
 export default function BackgroundBubbles() {
   const { backgroundImage } = useBackground();
+  const cachedBackgroundImage = useSessionImage(backgroundImage || '');
 
   return (
     <>
       {/* Scrollable top 2/5 custom background header */}
       <div className="absolute top-0 left-0 right-0 h-[40vh] overflow-hidden -z-10 pointer-events-none">
-        {backgroundImage ? (
-          <div
-            className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-95"
-            style={{ backgroundImage: `url(${backgroundImage})` }}
+        {cachedBackgroundImage ? (
+          <img
+            src={cachedBackgroundImage}
+            alt=""
+            decoding="async"
+            fetchPriority="high"
+            className="absolute inset-0 w-full h-full object-cover object-center opacity-95"
           />
         ) : (
           /* Default: match the main page background */

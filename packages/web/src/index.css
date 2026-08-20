@@ -336,6 +336,31 @@
     color: #fef08a;
   }
 
+  /* Search snippets are rendered inside clickable cards rather than .prose.
+     Reset link decoration so highlights only use the intended marker block. */
+  .search-result-link,
+  .search-result-link:hover,
+  .search-result-link:focus {
+    text-decoration: none;
+  }
+  .search-headline mark {
+    background-color: rgba(254, 240, 138, 0.78);
+    color: #374151;
+    /* Vertical padding on an inline mark does not expand the line box. When a
+       clamped next line is hidden, that background can bleed into the visible
+       line and look like an unrelated underline. Keep padding horizontal. */
+    padding: 0 0.2em;
+    border-radius: 3px;
+    line-height: inherit;
+    text-decoration: none;
+    box-decoration-break: clone;
+    -webkit-box-decoration-break: clone;
+  }
+  .dark .search-headline mark {
+    background-color: rgba(254, 240, 138, 0.25);
+    color: #fef08a;
+  }
+
   /* Footnotes */
   .prose .footnote-ref a {
     color: #5DAC81;

@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { adminApi } from '@/lib/api';
 import { IconSave, IconUser, IconCheck } from '@/components/Icons';
 import ImageCropperModal from '@/components/admin/ImageCropperModal';
+import { getSessionImageUrl } from '@/lib/sessionImageCache';
 
 const IconGithub = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
@@ -329,7 +330,7 @@ export default function Profile() {
                 title="点击上传本地头像"
               >
                 {avatarUrl ? (
-                  <img src={avatarUrl} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                  <img src={getSessionImageUrl(avatarUrl)} alt="" className="w-full h-full object-cover" onError={e => { (e.target as HTMLImageElement).style.display = 'none'; }} />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-300 dark:text-gray-600">
                     <IconUser size={28} />

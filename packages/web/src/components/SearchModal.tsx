@@ -130,7 +130,7 @@ export default function SearchModal({ open, onClose }: SearchModalProps) {
                     </h4>
                     {r.headline && (
                       <p
-                        className="text-xs text-gray-400 mt-0.5 line-clamp-1"
+                        className="search-headline text-xs text-gray-600 dark:text-gray-400 mt-0.5 truncate"
                         dangerouslySetInnerHTML={{ __html: r.headline }}
                       />
                     )}

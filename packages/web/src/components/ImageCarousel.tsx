@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import { useSessionImage } from '@/hooks/useSessionImage';
 
 const DEFAULT_GRADIENTS: Record<string, string> = {
   __DEFAULT_GRADIENT_1__: 'linear-gradient(135deg, #5DAC81, #3d8b65, #1e5631)',
@@ -39,15 +40,25 @@ export default function ImageCarousel({ images }: ImageCarouselProps) {
   }, [next, items.length]);
 
   const item = items[current];
-  const bgStyle = item.gradient_key && DEFAULT_GRADIENTS[item.gradient_key]
-    ? { background: DEFAULT_GRADIENTS[item.gradient_key] }
-    : item.image_url
-      ? { backgroundImage: `url(${item.image_url})`, backgroundSize: 'cover' as const, backgroundPosition: 'center' as const }
-      : { background: DEFAULT_GRADIENTS.__DEFAULT_GRADIENT_1__ };
+  const cachedImageUrl = useSessionImage(item.image_url || '');
+  const gradient = item.gradient_key && DEFAULT_GRADIENTS[item.gradient_key]
+    ? DEFAULT_GRADIENTS[item.gradient_key]
+    : null;
 
   return (
     <div className="glass rounded-3xl overflow-hidden relative h-[200px] sm:h-[240px] transition-all duration-500">
-      <div className="absolute inset-0 transition-opacity duration-500" style={bgStyle} />
+      {gradient ? (
+        <div className="absolute inset-0" style={{ background: gradient }} />
+      ) : cachedImageUrl ? (
+        <img
+          src={cachedImageUrl}
+          alt=""
+          decoding="async"
+          className="absolute inset-0 w-full h-full object-cover object-center"
+        />
+      ) : (
+        <div className="absolute inset-0" style={{ background: DEFAULT_GRADIENTS.__DEFAULT_GRADIENT_1__ }} />
+      )}
       {items.length > 1 && (
         <>
           <button onClick={prev} className="absolute left-3 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center text-white text-xl hover:bg-white/50 transition-all duration-200 z-10">‹</button>

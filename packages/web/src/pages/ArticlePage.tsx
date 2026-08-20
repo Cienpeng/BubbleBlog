@@ -9,6 +9,7 @@ import { IconArrowLeft, IconCalendar, IconClock, IconTag, IconCopy, IconCheck } 
 import LikeButton from '@/components/LikeButton';
 import { enhanceCodeBlocks } from '@/lib/markdown';
 import { useObfuscatedImage } from '@/hooks/useObfuscatedImage';
+import { rewriteArticleImageUrls } from '@/lib/sessionImageCache';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/atom-one-dark.css';
 
@@ -43,7 +44,10 @@ export default function ArticlePage() {
       fetch(`/api/articles/${slug}/carousel`).then(r => r.json()).then(d => d.data || []).catch(() => []),
     ])
       .then(([articleData, carouselData]) => {
-        setArticle(articleData);
+        setArticle({
+          ...articleData,
+          content_html: rewriteArticleImageUrls(articleData.content_html),
+        });
         setCarouselImages(carouselData);
       })
       .catch(() => setArticle(null))

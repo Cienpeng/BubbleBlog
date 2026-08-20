@@ -8,6 +8,7 @@ import TagCloud from '@/components/TagCloud';
 import GlassCard from '@/components/GlassCard';
 import { IconUser, IconCalendar } from '@/components/Icons';
 import { useObfuscatedImage } from '@/hooks/useObfuscatedImage';
+import { useSessionImage } from '@/hooks/useSessionImage';
 
 const ROTATIONS = [-0.3, 0.8, -1.0, 0.4, -0.6, 0.3, -0.7, 0.5, -0.4, 0.2];
 
@@ -142,6 +143,7 @@ export default function HomePage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [author, setAuthor] = useState<AuthorInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const cachedAvatarUrl = useSessionImage(author?.avatar_url || '');
 
   const { bioText, socials } = parseBioAndSocials(author?.bio || null);
   const [page, setPage] = useState(1);
@@ -325,9 +327,9 @@ export default function HomePage() {
               />
             )}
             <GlassCard className="p-6 text-center relative overflow-hidden">
-            {author?.avatar_url ? (
+            {cachedAvatarUrl ? (
               <div className="relative w-20 h-20 mx-auto mb-4 rounded-full ring-4 ring-brand/15 ring-offset-2 dark:ring-offset-black overflow-hidden shadow-sm">
-                <img src={author.avatar_url} alt="" className="w-full h-full object-cover" />
+                <img src={cachedAvatarUrl} alt="" decoding="async" className="w-full h-full object-cover" />
               </div>
             ) : (
               <div className="w-20 h-20 rounded-full bg-gradient-to-br from-brand/20 to-purple-500/20 ring-4 ring-brand/15 ring-offset-2 dark:ring-offset-black mx-auto mb-4 flex items-center justify-center shadow-sm">

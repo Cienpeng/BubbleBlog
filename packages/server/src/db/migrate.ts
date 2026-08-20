@@ -105,6 +105,24 @@ CREATE TRIGGER trg_search_vector
 -- Create GIN index for full text search
 CREATE INDEX IF NOT EXISTS idx_articles_search ON articles USING GIN(search_vector);
 
+-- Accelerate literal substring searches for Chinese and mixed-language queries.
+-- Partial indexes keep drafts out because the public search API only returns
+-- published articles.
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+CREATE INDEX IF NOT EXISTS idx_articles_title_trgm_published
+  ON articles USING GIN(title gin_trgm_ops)
+  WHERE status = 'published';
+CREATE INDEX IF NOT EXISTS idx_articles_content_trgm_published
+  ON articles USING GIN(content_md gin_trgm_ops)
+  WHERE status = 'published';
+
+-- Rows created before the search trigger existed may not have a vector yet.
+UPDATE articles
+SET search_vector =
+  setweight(to_tsvector('english', COALESCE(title, '')), 'A') ||
+  setweight(to_tsvector('english', COALESCE(content_md, '')), 'B')
+WHERE search_vector IS NULL;
+
 -- Site settings (key-value)
 CREATE TABLE IF NOT EXISTS site_settings (
   key VARCHAR(100) PRIMARY KEY,

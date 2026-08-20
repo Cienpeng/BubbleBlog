@@ -154,10 +154,10 @@ export default function SearchPage() {
         ) : (
           <div className="space-y-4">
             {results.map(r => (
-              <Link key={r.id} to={`/article/${r.slug}`} className="block glass rounded-2xl p-5 card-tilt">
+              <Link key={r.id} to={`/article/${r.slug}`} className="search-result-link block glass rounded-2xl p-5 card-tilt no-underline">
                 <h3 className="font-bold text-text-primary dark:text-white mb-1">{r.title}</h3>
                 {r.headline && (
-                  <p className="text-xs text-gray-500 dark:text-gray-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: r.headline }} />
+                  <p className="search-headline text-xs text-gray-500 dark:text-gray-400 leading-relaxed" dangerouslySetInnerHTML={{ __html: r.headline }} />
                 )}
                 <span className="text-[10px] text-gray-400 mt-2 block">
                   {r.published_at ? new Date(r.published_at).toLocaleDateString('zh-CN') : ''}
