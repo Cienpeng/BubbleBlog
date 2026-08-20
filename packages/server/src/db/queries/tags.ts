@@ -1,5 +1,5 @@
 import sql from '../connection';
-import type { Tag } from '@bubbleblog/shared';
+import { normalizeTagName, type Tag } from '@bubbleblog/shared';
 
 export async function getAllTags(): Promise<Tag[]> {
   return await sql`
@@ -12,10 +12,11 @@ export async function getAllTags(): Promise<Tag[]> {
 }
 
 export async function getOrCreateTags(tagNames: string[]): Promise<Tag[]> {
-  const trimmed = tagNames
-    .slice(0, 20)
-    .map(n => n.trim().slice(0, 50))
-    .filter(Boolean);
+  const trimmed = [...new Set(
+    tagNames
+      .map(name => normalizeTagName(name).slice(0, 50))
+      .filter(Boolean)
+  )].slice(0, 20);
   if (trimmed.length === 0) return [];
 
   // Generate slugs

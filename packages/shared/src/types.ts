@@ -105,3 +105,18 @@ export interface UpdateArticleInput {
   excerpt?: string;
   cover_image?: string;
 }
+
+/**
+ * Uppercase English-only tag names while leaving tags containing non-ASCII
+ * text unchanged. Punctuation, spaces, and numbers are allowed in an English
+ * tag as long as it contains at least one A-Z letter.
+ */
+export function normalizeTagName(value: string): string {
+  const trimmed = value.trim();
+  const isEnglishTag = /^[\x00-\x7F]+$/.test(trimmed) && /[A-Za-z]/.test(trimmed);
+  return isEnglishTag ? trimmed.replace(/[a-z]/g, letter => letter.toUpperCase()) : trimmed;
+}
+
+export function normalizeTagNames(values: readonly string[]): string[] {
+  return [...new Set(values.map(normalizeTagName).filter(Boolean))];
+}

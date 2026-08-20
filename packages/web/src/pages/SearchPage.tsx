@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { api } from '@/lib/api';
-import type { SearchResult, ArticleListItem } from '@bubbleblog/shared';
+import { normalizeTagName, type SearchResult, type ArticleListItem } from '@bubbleblog/shared';
 import SearchBar from '../components/SearchBar';
 import { IconList, IconArrowLeft } from '../components/Icons';
 
@@ -109,7 +109,7 @@ export default function SearchPage() {
                       <div className="flex items-center gap-3 text-[10px] text-gray-400 flex-shrink-0">
                         {article.tags?.slice(0, 2).map(t => (
                           <span key={t.id} className="px-2 py-0.5 rounded-full bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand-light">
-                            {t.name}
+                            {normalizeTagName(t.name)}
                           </span>
                         ))}
                         <span>{article.published_at ? new Date(article.published_at).toLocaleDateString('zh-CN') : ''}</span>

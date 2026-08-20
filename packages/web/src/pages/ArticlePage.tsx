@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '@/lib/api';
-import type { ArticleWithTags } from '@bubbleblog/shared';
+import { normalizeTagName, type ArticleWithTags } from '@bubbleblog/shared';
 import ImageCarousel from '@/components/ImageCarousel';
 import OrganicHeading from '@/components/OrganicHeading';
 import BackToTop from '@/components/BackToTop';
@@ -138,7 +138,7 @@ export default function ArticlePage() {
             <span className="inline-flex items-center gap-1"><IconClock size={13} /> {article.reading_time} min</span>
             <span className="inline-flex items-center gap-1">
               <IconTag size={13} /> {article.tags.map(t => (
-                <Link key={t.id} to={`/tag/${t.slug}`} className="text-link hover:underline ml-1">{t.name}</Link>
+                <Link key={t.id} to={`/tag/${t.slug}`} className="text-link hover:underline ml-1">{normalizeTagName(t.name)}</Link>
               ))}
             </span>
           </div>

@@ -5,6 +5,7 @@ import { IconArrowLeft, IconTrash, IconSave, IconRocket } from '@/components/Ico
 import { adminApi } from '@/lib/api';
 import { marked } from 'marked';
 import { enhanceCodeBlocks } from '@/lib/markdown';
+import { normalizeTagName, normalizeTagNames } from '@bubbleblog/shared';
 
 // Configure marked for safe rendering
 marked.setOptions({ breaks: true, gfm: true });
@@ -62,7 +63,7 @@ export default function ArticleEditor() {
         setArticle(data);
         setTitle(data.title || '');
         setMarkdown(data.content_md || '');
-        setTags(data.tags?.map(t => t.name) || []);
+        setTags(normalizeTagNames(data.tags?.map(t => t.name) || []));
         lastSavedMarkdown.current = data.content_md || '';
         lastSavedTitle.current = data.title || '';
       } catch (err: any) {
@@ -109,12 +110,14 @@ export default function ArticleEditor() {
     setSaving(true);
     setError('');
     try {
+      const normalizedTags = normalizeTagNames(tags);
+      setTags(normalizedTags);
       if (isNew) {
         // Create new article
         const { data, newToken } = await adminApi.post<Article>('/api/articles/upload', {
           title,
           content_md: markdown,
-          tags,
+          tags: normalizedTags,
         });
         if (newToken) updateToken(newToken);
         setArticle(data);
@@ -128,7 +131,7 @@ export default function ArticleEditor() {
         const { data, newToken } = await adminApi.post<Article>(`/api/articles/${id}`, {
           title,
           content_md: markdown,
-          tags,
+          tags: normalizedTags,
         });
         if (newToken) updateToken(newToken);
         setArticle(data);
@@ -180,13 +183,15 @@ export default function ArticleEditor() {
     try {
       let currentArticle = article;
       let nextTokenToUse: string | undefined;
+      const normalizedTags = normalizeTagNames(tags);
+      setTags(normalizedTags);
 
       if (isNew) {
         // Create new article first
         const { data, newToken } = await adminApi.post<Article>('/api/articles/upload', {
           title,
           content_md: markdown,
-          tags,
+          tags: normalizedTags,
         });
         currentArticle = data;
         nextTokenToUse = newToken;
@@ -335,7 +340,7 @@ export default function ArticleEditor() {
             onKeyDown={e => {
               if (e.key === 'Enter') {
                 e.preventDefault();
-                const name = tagInput.trim();
+                const name = normalizeTagName(tagInput);
                 if (name && !tags.includes(name)) setTags(prev => [...prev, name]);
                 setTagInput('');
               }

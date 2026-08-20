@@ -4,6 +4,7 @@ import { adminApi } from '@/lib/api';
 import { IconSave, IconUser, IconCheck } from '@/components/Icons';
 import ImageCropperModal from '@/components/admin/ImageCropperModal';
 import { getSessionImageUrl } from '@/lib/sessionImageCache';
+import { normalizeTagName, normalizeTagNames } from '@bubbleblog/shared';
 
 const IconGithub = ({ className }: { className?: string }) => (
   <svg className={className} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
@@ -98,7 +99,7 @@ export default function Profile() {
       setProfile(data);
       setDisplayName(data.display_name || '');
       setAvatarUrl(data.avatar_url || '');
-      setTags(data.tags?.map(t => t.name) || []);
+      setTags(normalizeTagNames(data.tags?.map(t => t.name) || []));
 
       // Parse bio and socials from bio column
       const rawBio = data.bio || '';
@@ -168,6 +169,8 @@ export default function Profile() {
     setSavingProfile(true);
     setProfileMsg('');
     try {
+      const normalizedTags = normalizeTagNames(tags);
+      setTags(normalizedTags);
       const serializedBio = JSON.stringify({
         bio: bio,
         github,
@@ -180,7 +183,7 @@ export default function Profile() {
         display_name: displayName,
         bio: serializedBio,
         avatar_url: avatarUrl,
-        tags,
+        tags: normalizedTags,
       });
       if (newToken) updateToken(newToken);
       setProfile(data);
@@ -199,6 +202,8 @@ export default function Profile() {
     setSavingSocials(true);
     setSocialsMsg('');
     try {
+      const normalizedTags = normalizeTagNames(tags);
+      setTags(normalizedTags);
       const serializedBio = JSON.stringify({
         bio: bio,
         github,
@@ -211,7 +216,7 @@ export default function Profile() {
         display_name: displayName,
         bio: serializedBio,
         avatar_url: avatarUrl,
-        tags,
+        tags: normalizedTags,
       });
       if (newToken) updateToken(newToken);
       setProfile(data);
@@ -235,7 +240,7 @@ export default function Profile() {
 
   // Add tag
   const addTag = () => {
-    const name = tagInput.trim();
+    const name = normalizeTagName(tagInput);
     if (name) {
       if (tags.length >= 10) {
         alert('最多只能添加 10 个标签');

@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { IconUpload, IconPlus, IconArticles, IconHeart } from '@/components/Icons';
 import { adminApi } from '@/lib/api';
+import { normalizeTagName } from '@bubbleblog/shared';
 
 interface Article {
   id: number;
@@ -260,7 +261,9 @@ export default function Dashboard() {
                 className="flex items-center justify-between text-xs pl-3.5 pr-8 py-1.5 rounded-xl bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 outline-none text-text-primary dark:text-white/80 cursor-pointer font-medium hover:bg-black/[0.02] dark:hover:bg-white/[0.02] transition-colors min-w-[100px] relative"
               >
                 <span>
-                  {tagFilter === 'all' ? '所有标签' : (availableTags.find(t => t.slug === tagFilter)?.name || '所有标签')}
+                  {tagFilter === 'all'
+                    ? '所有标签'
+                    : normalizeTagName(availableTags.find(t => t.slug === tagFilter)?.name || '所有标签')}
                 </span>
                 <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500">
                   <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${tagDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -299,7 +302,7 @@ export default function Dashboard() {
                           : 'text-text-primary dark:text-white/80 hover:bg-black/[0.02] dark:hover:bg-white/[0.02]'
                       }`}
                     >
-                      {tag.name}
+                      {normalizeTagName(tag.name)}
                     </button>
                   ))}
                 </div>
@@ -398,7 +401,7 @@ export default function Dashboard() {
                 <div className="flex items-center gap-2">
                   {article.tags?.slice(0, 2).map(t => (
                     <span key={t.id} className="text-[10px] px-1.5 py-0.5 rounded-md bg-black/[0.03] dark:bg-white/[0.04] text-gray-400">
-                      {t.name}
+                      {normalizeTagName(t.name)}
                     </span>
                   ))}
                   <button

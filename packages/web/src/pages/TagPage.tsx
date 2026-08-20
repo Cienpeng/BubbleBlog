@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { api } from '@/lib/api';
-import type { ArticleListItem } from '@bubbleblog/shared';
+import { normalizeTagName, type ArticleListItem } from '@bubbleblog/shared';
 import ArticleCard from '../components/ArticleCard';
 import { IconArrowLeft } from '../components/Icons';
 
@@ -24,7 +24,7 @@ export default function TagPage() {
       <div className="mb-8">
         <Link to="/" className="text-sm text-gray-400 hover:text-link transition-colors"><IconArrowLeft size={14} className="mr-1 inline" />返回首页</Link>
         <h1 className="text-2xl font-extrabold text-text-primary dark:text-white mt-2">
-          标签：{slug}
+          标签：{normalizeTagName(slug || '')}
         </h1>
         <p className="text-sm text-gray-400 mt-1">{articles.length} 篇文章</p>
       </div>

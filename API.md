@@ -120,7 +120,7 @@ packages/server/
 | `/api/articles/:slug/carousel` | GET | - | 文章专属轮播图(草稿文章仅认证管理员可查看) |
 | `/api/articles/:slug/likes` | GET | - | 点赞计数与当前设备点赞状态查询(通过 `fingerprint` 参数区分设备) |
 | `/api/articles/:slug/likes` | POST | - | 点赞状态切换(请求体需携带 `fingerprint`,受 10/min 限流) |
-| `/api/tags` | GET | - | 全部标签列表(含各标签文章计数) |
+| `/api/tags` | GET | - | 全部标签列表(含各标签文章计数;纯英文标签统一以大写名称保存和展示) |
 | `/api/search` | GET | - | 全文搜索(基于 PostgreSQL tsvector,参数 `q`) |
 | `/api/settings` | GET | - | 获取站点外观设置 |
 | `/api/settings` | POST | 是 | 修改站点设置(当前支持 `background_image`,自动清理被替换的旧图片) |

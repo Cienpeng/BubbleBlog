@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import type { ArticleListItem } from '@bubbleblog/shared';
+import { normalizeTagName, type ArticleListItem } from '@bubbleblog/shared';
 import { IconCalendar, IconClock } from './Icons';
 import { preloadModule, routeModules } from '@/routes/routeModules';
 
@@ -69,9 +69,9 @@ export default function ArticleCard({ article, variant, style, isHovered, isDimm
           {article.tags.slice(0, 3).map(tag => (
             <span
               key={tag.id}
-              className="px-2.5 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand-light"
+              className="px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wider bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand-light"
             >
-              {tag.name}
+              {normalizeTagName(tag.name)}
             </span>
           ))}
         </div>

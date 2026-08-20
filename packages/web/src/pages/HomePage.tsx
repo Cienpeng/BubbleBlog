@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import type { ArticleListItem, Tag } from '@bubbleblog/shared';
+import { normalizeTagName, type ArticleListItem, type Tag } from '@bubbleblog/shared';
 import { api } from '@/lib/api';
 import BentoGrid from '@/components/BentoGrid';
 import ArticleCard from '@/components/ArticleCard';
@@ -346,7 +346,7 @@ export default function HomePage() {
               <div className="flex flex-wrap gap-1 justify-center mt-3.5">
                 {author.tags.slice(0, 5).map(t => (
                   <span key={t.id} className="px-2.5 py-0.5 rounded-full text-[9px] font-bold tracking-wide bg-brand/10 text-brand dark:bg-brand/20 dark:text-brand-light">
-                    {t.name}
+                    {normalizeTagName(t.name)}
                   </span>
                 ))}
               </div>
