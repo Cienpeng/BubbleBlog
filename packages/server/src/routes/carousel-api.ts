@@ -88,9 +88,9 @@ export async function handleCarouselAPI(req: Request): Promise<Response> {
     );
   }
 
-  // DELETE /api/admin/carousel/:id — admin: delete carousel image
-  const deleteMatch = url.pathname.match(/^\/api\/admin\/carousel\/(\d+)$/);
-  if (deleteMatch && req.method === 'DELETE') {
+  // POST /api/admin/carousel/:id/delete — admin: delete carousel image
+  const deleteMatch = url.pathname.match(/^\/api\/admin\/carousel\/(\d+)\/delete$/);
+  if (deleteMatch && req.method === 'POST') {
     const auth = await requireAuth(req);
     if (!auth.authorized) return auth.response!;
 

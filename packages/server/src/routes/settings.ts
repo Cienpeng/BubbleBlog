@@ -17,8 +17,8 @@ export async function handleSettings(req: Request): Promise<Response> {
     return Response.json({ success: true, data: settings }, { headers: corsHeaders() });
   }
 
-  // PUT /api/settings — admin only
-  if (url.pathname === '/api/settings' && req.method === 'PUT') {
+  // POST /api/settings — admin only
+  if (url.pathname === '/api/settings' && req.method === 'POST') {
     const auth = await requireAuth(req);
     if (!auth.authorized) return auth.response!;
 

@@ -238,9 +238,9 @@ export async function handleArticles(req: Request): Promise<Response> {
     );
   }
 
-  // PUT /api/articles/:id/publish
+  // POST /api/articles/:id/publish
   const publishMatch = url.pathname.match(/^\/api\/articles\/(\d+)\/publish$/);
-  if (publishMatch && req.method === 'PUT') {
+  if (publishMatch && req.method === 'POST') {
     const auth = await requireAuth(req);
     if (!auth.authorized) return auth.response!;
 
@@ -262,9 +262,9 @@ export async function handleArticles(req: Request): Promise<Response> {
     );
   }
 
-  // PUT /api/articles/:id/unpublish
+  // POST /api/articles/:id/unpublish
   const unpublishMatch = url.pathname.match(/^\/api\/articles\/(\d+)\/unpublish$/);
-  if (unpublishMatch && req.method === 'PUT') {
+  if (unpublishMatch && req.method === 'POST') {
     const auth = await requireAuth(req);
     if (!auth.authorized) return auth.response!;
 
@@ -286,9 +286,9 @@ export async function handleArticles(req: Request): Promise<Response> {
     );
   }
 
-  // PUT /api/articles/:id — update
+  // POST /api/articles/:id — update
   const updateMatch = url.pathname.match(/^\/api\/articles\/(\d+)$/);
-  if (updateMatch && req.method === 'PUT') {
+  if (updateMatch && req.method === 'POST') {
     const auth = await requireAuth(req);
     if (!auth.authorized) return auth.response!;
 
@@ -313,25 +313,25 @@ export async function handleArticles(req: Request): Promise<Response> {
       if (rendered.tags && rendered.tags.length > 0) {
         const tags = await getOrCreateTags(rendered.tags);
         await setArticleTags(id, tags.map(t => t.id));
-        // console.log(`[tags] PUT frontmatter tags for ${id}:`, rendered.tags);
+        // console.log(`[tags] POST frontmatter tags for ${id}:`, rendered.tags);
       }
     }
 
     // Explicit tags (from editor UI, overrides frontmatter)
     if (Array.isArray(body.tags)) {
       const tagNames: string[] = body.tags.filter((t: any) => typeof t === 'string' && t.trim());
-      // console.log(`[tags] PUT explicit for ${id}:`, tagNames);
+      // console.log(`[tags] POST explicit for ${id}:`, tagNames);
       if (tagNames.length > 0) {
         const tags = await getOrCreateTags(tagNames);
         await setArticleTags(id, tags.map(t => t.id));
-        // console.log(`[tags] PUT saved ${tags.length} tags for ${id}`);
+        // console.log(`[tags] POST saved ${tags.length} tags for ${id}`);
       } else if (body.tags.length === 0) {
         await setArticleTags(id, []);
-        // console.log(`[tags] PUT cleared tags for ${id}`);
+        // console.log(`[tags] POST cleared tags for ${id}`);
       }
     } 
     // else {
-    //   console.log(`[tags] PUT body.tags type:`, typeof body.tags, JSON.stringify(body.tags));
+    //   console.log(`[tags] POST body.tags type:`, typeof body.tags, JSON.stringify(body.tags));
     // }
 
     const article = await updateArticle(id, body);
@@ -356,18 +356,19 @@ export async function handleArticles(req: Request): Promise<Response> {
     );
   }
 
-  // DELETE /api/articles/:id
-  if (updateMatch && req.method === 'DELETE') {
+  // POST /api/articles/:id/delete
+  const deleteMatch = url.pathname.match(/^\/api\/articles\/(\d+)\/delete$/);
+  if (deleteMatch && req.method === 'POST') {
     const auth = await requireAuth(req);
     if (!auth.authorized) return auth.response!;
 
-    const deleted = await deleteArticle(parseInt(updateMatch[1]));
+    const deleted = await deleteArticle(parseInt(deleteMatch[1]));
     if (!deleted) {
       return Response.json({ success: false, error: 'Not found' }, { status: 404, headers: corsHeaders() });
     }
     const userPayload = await getUserId(req);
     if (userPayload) {
-      securityService.recordActivity(userPayload.userId, `彻底删除文章 (ID: ${updateMatch[1]})`, 'success');
+      securityService.recordActivity(userPayload.userId, `彻底删除文章 (ID: ${deleteMatch[1]})`, 'success');
     }
 
     return Response.json(

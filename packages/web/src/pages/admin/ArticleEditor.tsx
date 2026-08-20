@@ -125,7 +125,7 @@ export default function ArticleEditor() {
         navigate(`/admin/articles/${data.id}/edit`, { replace: true });
       } else {
         // Update existing
-        const { data, newToken } = await adminApi.put<Article>(`/api/articles/${id}`, {
+        const { data, newToken } = await adminApi.post<Article>(`/api/articles/${id}`, {
           title,
           content_md: markdown,
           tags,
@@ -163,7 +163,7 @@ export default function ArticleEditor() {
       const endpoint = article.status === 'draft'
         ? `/api/articles/${article.id}/publish`
         : `/api/articles/${article.id}/unpublish`;
-      const { data, newToken } = await adminApi.put<Article>(endpoint);
+      const { data, newToken } = await adminApi.post<Article>(endpoint);
       if (newToken) updateToken(newToken);
       setArticle(data);
       setSavedAt(new Date());
@@ -201,7 +201,7 @@ export default function ArticleEditor() {
 
       if (currentArticle) {
         // Publish it
-        const { data: publishedArticle, newToken } = await adminApi.put<Article>(`/api/articles/${currentArticle.id}/publish`);
+        const { data: publishedArticle, newToken } = await adminApi.post<Article>(`/api/articles/${currentArticle.id}/publish`);
         const finalToken = newToken || nextTokenToUse;
         if (finalToken) updateToken(finalToken);
         setArticle(publishedArticle);
@@ -218,7 +218,7 @@ export default function ArticleEditor() {
     if (!article) return;
     if (!confirm(`确定删除「${article.title || '未命名'}」？不可撤销。`)) return;
     try {
-      const { newToken } = await adminApi.delete(`/api/articles/${article.id}`);
+      const { newToken } = await adminApi.post(`/api/articles/${article.id}/delete`);
       if (newToken) updateToken(newToken);
       navigate('/admin', { replace: true });
     } catch (err: any) {

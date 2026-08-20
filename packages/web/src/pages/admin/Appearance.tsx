@@ -109,7 +109,7 @@ export default function Appearance() {
     setSaving(true);
     setSaved(false);
     try {
-      const { newToken } = await adminApi.put<Record<string, string>>('/api/settings', {
+      const { newToken } = await adminApi.post<Record<string, string>>('/api/settings', {
         background_image: bgUrl,
       });
       if (newToken) updateToken(newToken);
@@ -143,7 +143,7 @@ export default function Appearance() {
 
   const removeImage = useCallback(async (id: number) => {
     try {
-      const { newToken } = await adminApi.delete(`/api/admin/carousel/${id}`);
+      const { newToken } = await adminApi.post(`/api/admin/carousel/${id}/delete`);
       if (newToken) updateToken(newToken);
       setImages(prev => prev.filter(img => img.id !== id));
     } catch (err) {

@@ -18,13 +18,13 @@ export default function CommandPalette() {
   const navigate = useNavigate();
 
   const commands = useMemo<Command[]>(() => [
-    { id: 'new-article', label: '写新文章', shortcut: 'N', Icon: IconPlus, action: () => navigate('/admin/articles/new') },
-    { id: 'dashboard', label: '文章管理', shortcut: 'D', Icon: IconArticles, action: () => navigate('/admin') },
-    { id: 'stats', label: '数据统计', shortcut: 'S', Icon: IconStats, action: () => navigate('/admin/stats') },
-    { id: 'appearance', label: '外观设置', shortcut: 'A', Icon: IconAppearance, action: () => navigate('/admin/appearance') },
-    { id: 'security', label: '安全中心', shortcut: 'G', Icon: IconShield, action: () => navigate('/admin/security') },
-    { id: 'profile', label: '个人资料', shortcut: 'P', Icon: IconUser, action: () => navigate('/admin/profile') },
-    { id: 'home', label: '返回前台', shortcut: 'H', Icon: IconHome, action: () => navigate('/') },
+    { id: 'new-article', label: '写新文章', shortcut: '1', Icon: IconPlus, action: () => navigate('/admin/articles/new') },
+    { id: 'dashboard', label: '文章管理', shortcut: '2', Icon: IconArticles, action: () => navigate('/admin') },
+    { id: 'stats', label: '数据统计', shortcut: '3', Icon: IconStats, action: () => navigate('/admin/stats') },
+    { id: 'appearance', label: '外观设置', shortcut: '4', Icon: IconAppearance, action: () => navigate('/admin/appearance') },
+    { id: 'security', label: '安全中心', shortcut: '5', Icon: IconShield, action: () => navigate('/admin/security') },
+    { id: 'profile', label: '个人资料', shortcut: '6', Icon: IconUser, action: () => navigate('/admin/profile') },
+    { id: 'home', label: '返回前台', shortcut: '7', Icon: IconHome, action: () => navigate('/') },
   ], [navigate]);
 
   const filtered = useMemo(() => query
@@ -32,27 +32,25 @@ export default function CommandPalette() {
     : commands, [commands, query]);
 
   const onKeyDown = useCallback((e: KeyboardEvent) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+    if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
       e.preventDefault();
       setOpen(o => !o);
       return;
     }
 
-    if (!open) {
-      const target = e.target as HTMLElement | null;
-      const isEditing = target?.isContentEditable
-        || target?.tagName === 'INPUT'
-        || target?.tagName === 'TEXTAREA'
-        || target?.tagName === 'SELECT';
-      if (isEditing || e.ctrlKey || e.metaKey || e.altKey || e.repeat || e.key.length !== 1) return;
-
+    if (e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.repeat && e.key.length === 1) {
       const shortcutCommand = commands.find(
         command => command.shortcut?.toLowerCase() === e.key.toLowerCase(),
       );
       if (shortcutCommand) {
         e.preventDefault();
         shortcutCommand.action();
+        setOpen(false);
+        return;
       }
+    }
+
+    if (!open) {
       return;
     }
 
@@ -89,7 +87,7 @@ export default function CommandPalette() {
       <button
         onClick={() => setOpen(true)}
         className="fixed bottom-6 right-6 z-40 w-14 h-14 rounded-full glass flex items-center justify-center hover:scale-110 transition-transform duration-200 shadow-lg hover:shadow-xl"
-        title="指令面板 (Ctrl+K)"
+        title="指令面板 (Alt+K)"
       >
         <IconBubble size={26} className="text-brand" />
       </button>
@@ -130,7 +128,7 @@ export default function CommandPalette() {
                   <span>{cmd.label}</span>
                   {cmd.shortcut && (
                     <kbd className="ml-auto text-[10px] px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/[0.06] text-gray-400 font-mono">
-                      {cmd.shortcut}
+                      Alt+{cmd.shortcut}
                     </kbd>
                   )}
                 </button>

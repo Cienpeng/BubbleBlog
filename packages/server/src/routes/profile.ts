@@ -61,8 +61,8 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
     );
   }
 
-  // PUT /api/admin/profile
-  if (url.pathname === '/api/admin/profile' && req.method === 'PUT') {
+  // POST /api/admin/profile
+  if (url.pathname === '/api/admin/profile' && req.method === 'POST') {
     const auth = await requireAuth(req);
     if (!auth.authorized) return auth.response!;
 
@@ -116,8 +116,8 @@ export async function handleProfile(req: Request, server?: any): Promise<Respons
     );
   }
 
-  // PUT /api/admin/password
-  if (url.pathname === '/api/admin/password' && req.method === 'PUT') {
+  // POST /api/admin/password
+  if (url.pathname === '/api/admin/password' && req.method === 'POST') {
     const auth = await requireAuth(req);
     if (!auth.authorized) return auth.response!;
 

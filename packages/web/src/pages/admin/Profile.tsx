@@ -176,7 +176,7 @@ export default function Profile() {
         twitter,
       });
 
-      const { data, newToken } = await adminApi.put<UserProfile>('/api/admin/profile', {
+      const { data, newToken } = await adminApi.post<UserProfile>('/api/admin/profile', {
         display_name: displayName,
         bio: serializedBio,
         avatar_url: avatarUrl,
@@ -207,7 +207,7 @@ export default function Profile() {
         twitter,
       });
 
-      const { data, newToken } = await adminApi.put<UserProfile>('/api/admin/profile', {
+      const { data, newToken } = await adminApi.post<UserProfile>('/api/admin/profile', {
         display_name: displayName,
         bio: serializedBio,
         avatar_url: avatarUrl,
@@ -272,7 +272,7 @@ export default function Profile() {
 
     setSavingPw(true);
     try {
-      await adminApi.put('/api/admin/password', {
+      await adminApi.post('/api/admin/password', {
         current_password: currentPw,
         new_password: newPw,
       });

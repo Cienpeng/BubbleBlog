@@ -96,10 +96,10 @@ export default function Dashboard() {
     setActionLoading(article.id);
     try {
       if (article.status === 'draft') {
-        const { newToken } = await adminApi.put(`/api/articles/${article.id}/publish`);
+        const { newToken } = await adminApi.post(`/api/articles/${article.id}/publish`);
         if (newToken) updateToken(newToken);
       } else {
-        const { newToken } = await adminApi.put(`/api/articles/${article.id}/unpublish`);
+        const { newToken } = await adminApi.post(`/api/articles/${article.id}/unpublish`);
         if (newToken) updateToken(newToken);
       }
       await fetchData();
@@ -114,7 +114,7 @@ export default function Dashboard() {
     if (!confirm(`确定删除「${article.title}」？此操作不可撤销。`)) return;
     setActionLoading(article.id);
     try {
-      const { newToken } = await adminApi.delete(`/api/articles/${article.id}`);
+      const { newToken } = await adminApi.post(`/api/articles/${article.id}/delete`);
       if (newToken) updateToken(newToken);
       await fetchData();
     } catch (err) {

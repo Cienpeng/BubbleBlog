@@ -18,6 +18,7 @@ import { RequestBodyError, bodyErrorResponse } from './middleware/body';
 import { deleteExpiredCaptchas } from './db/queries/captchas';
 import { securityService } from './services/security';
 import { takeSessionRefreshCookie } from './middleware/auth';
+import { rejectUnsupportedMethod } from './middleware/methods';
 
 const PORT = parseInt(process.env.PORT || '3000');
 
@@ -94,18 +95,22 @@ Bun.serve({
     const url = new URL(req.url);
     registerClientIP(req, server.requestIP(req)?.address);
 
+    // OPTIONS is only a protocol-level CORS preflight. Business endpoints
+    // expose GET and POST exclusively.
+    const corsResponse = handleCors(req);
+    if (corsResponse) return addSecurityHeaders(req, corsResponse);
+
+    const methodResponse = rejectUnsupportedMethod(req);
+    if (methodResponse) return addSecurityHeaders(req, methodResponse);
+
     // Health check (no rate limit)
-    if (url.pathname === '/api/health') {
+    if (url.pathname === '/api/health' && req.method === 'GET') {
       return addSecurityHeaders(req, Response.json({ success: true, data: { status: 'ok', timestamp: Date.now() } }));
     }
 
     // Global rate limit
     const rateLimitResponse = globalRateLimit(req);
     if (rateLimitResponse) return addSecurityHeaders(req, rateLimitResponse);
-
-    // CORS preflight
-    const corsResponse = handleCors(req);
-    if (corsResponse) return addSecurityHeaders(req, corsResponse);
 
     try {
       // Route matching
